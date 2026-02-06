@@ -1,6 +1,9 @@
 const STORAGE_KEY = 'thaikick_referral';
 const EXPIRY_DAYS = 30;
 
+
+
+
 interface ReferralData {
   code: string;
   timestamp: number;
