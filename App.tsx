@@ -52,13 +52,13 @@ const Notification: React.FC<{ message: string; type: 'success' | 'error'; onClo
 
 const BlockInput: React.FC<{ label: string; value?: string; onChange?: (e: any) => void; placeholder?: string; type?: string }> = ({ label, value, onChange, placeholder, type = "text" }) => (
   <div className="p-6 border-b md:border-b-0 md:border-r border-brand-charcoal last:border-r-0 md:border-gray-200">
-    <label className="block font-mono text-xs text-brand-blue font-bold mb-2 uppercase">{label}</label>
+    <label className="block font-mono text-sm text-brand-blue font-bold mb-2 uppercase">{label}</label>
     <input
       type={type}
       value={value}
       onChange={onChange}
       placeholder={placeholder}
-      className="w-full bg-transparent border-none outline-none font-mono text-base text-brand-charcoal placeholder-gray-300"
+      className="w-full bg-transparent border-none outline-none font-mono text-xl text-brand-charcoal placeholder-gray-300"
     />
   </div>
 );
@@ -70,7 +70,7 @@ const GymCard: React.FC<{ gym: Gym; onBook: () => void; isLarge?: boolean }> = (
       <img
         src={gym.images[0]}
         alt={gym.name}
-        className="w-full h-full object-cover grayscale contrast-125 group-hover:grayscale-0 transition-all duration-500"
+        className="w-full h-full object-cover contrast-125 transition-all duration-500"
       />
       {gym.isFlashSale && (
         <div className="absolute top-0 left-0 bg-brand-red text-white font-mono text-xs px-4 py-2 font-bold animate-pulse">
@@ -209,7 +209,7 @@ const HomePage: React.FC<{ user: User | null; gyms: Gym[]; setBookings: any; cat
               {index === 0 && (
                 <div className="col-span-12 md:col-span-6 bg-brand-blue text-white p-12 flex flex-col justify-center animate-reveal" style={{ animationDelay: '0.2s' }}>
                   <Mono className="text-brand-bone mb-4">Tradition</Mono>
-                  <h2 className="text-5xl font-black mb-6 uppercase">The Art of Eight Limbs</h2>
+                  <h2 className="text-5xl font-black mb-6 uppercase text-brand-red">The Art of Eight Limbs</h2>
                   <p className="opacity-90 leading-relaxed max-w-md mb-8">
                     Booking a gym shouldn't be a fight. We connect practitioners with verified camps that respect the lineage of the sport.
                   </p>
@@ -244,10 +244,13 @@ const DashboardContainer: React.FC<{ title: string; subtitle: string; children: 
   </div>
 );
 
-const BlockTable: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
+const BlockTable: React.FC<{ title: string; children: React.ReactNode; icon?: React.ReactNode }> = ({ title, children, icon }) => (
   <div className="border-2 border-brand-charcoal bg-white">
     <div className="p-4 border-b-2 border-brand-charcoal bg-brand-bone flex justify-between items-center">
-      <h3 className="font-black uppercase tracking-wide text-sm">{title}</h3>
+      <div className="flex items-center gap-2">
+        {icon}
+        <h3 className="font-black uppercase tracking-wide text-sm">{title}</h3>
+      </div>
       <div className="flex gap-1">
         <Square className="w-3 h-3 text-brand-charcoal fill-current" />
       </div>
@@ -731,7 +734,7 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#F9F9F9]">
         <div className="font-black text-3xl text-brand-charcoal animate-pulse">
-          THAI<span className="text-brand-red">KICK</span>
+          <img src="/logo.png" alt="Thaikick" className="h-16 w-auto object-contain" />
         </div>
         <Mono className="text-brand-blue mt-4">Authenticating...</Mono>
       </div>
@@ -766,8 +769,8 @@ const App: React.FC = () => {
         <footer className="bg-brand-charcoal text-white py-24">
           <div className="max-w-[1440px] mx-auto px-4 sm:px-10 grid grid-cols-1 md:grid-cols-4 gap-12">
             <div className="md:col-span-2">
-              <Link to="/" className="font-black text-2xl text-white tracking-tighter flex items-center gap-1 mb-6">
-                THAI<span className="text-brand-blue">KICK</span>
+              <Link to="/" className="flex items-center gap-1 mb-6">
+                <img src="/logo.png" alt="Thaikick" className="h-10 w-auto object-contain" />
               </Link>
               <p className="font-mono text-sm opacity-50 max-w-xs leading-relaxed">
                 Standardizing the Muay Thai experience for the global community.

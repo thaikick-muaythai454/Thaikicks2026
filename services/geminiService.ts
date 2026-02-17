@@ -1,6 +1,7 @@
+/// <reference types="vite/client" />
 import { GoogleGenAI } from "@google/genai";
 
-const apiKey = process.env.API_KEY || '';
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
 let ai: GoogleGenAI | null = null;
 
 const getAiClient = () => {
@@ -47,7 +48,7 @@ export const chatWithGemini = async (
       }
     });
 
-    const result = await chat.sendMessage(message);
+    const result = await chat.sendMessage(message as any);
     return result.text;
 
   } catch (error) {

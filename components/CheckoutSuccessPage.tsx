@@ -43,8 +43,8 @@ const Receipt: React.FC<{ order: ReceiptData; isVisible: boolean }> = ({ order, 
             >
                 {/* Receipt Header */}
                 <div className="p-8 pb-4 text-center border-b-2 border-dashed border-gray-200 pt-10">
-                    <div className="font-black text-2xl tracking-tighter text-brand-charcoal mb-2">
-                        THAI<span className="text-brand-red">KICK</span>
+                    <div className="mb-2 flex justify-center">
+                        <img src="/logo.png" alt="Thaikick" className="h-8 w-auto object-contain" />
                     </div>
                     <Mono className="text-gray-400 block mb-1">TERMINAL 01</Mono>
                     <Mono className="text-gray-400 block">{order.date}</Mono>

@@ -27,8 +27,8 @@ const Navbar: React.FC<NavbarProps> = ({ activeUser, onLogout }) => {
       <nav className="h-[100px] border-b border-brand-charcoal/10 sticky top-0 bg-[#F9F9F9]/90 backdrop-blur-md z-40">
         <div className="max-w-[1440px] mx-auto px-4 sm:px-10 h-full flex items-center justify-between">
           {/* Logo */}
-          <Link to="/" className="font-black text-2xl text-brand-blue tracking-tighter flex items-center gap-1 group">
-            THAI<span className="text-brand-red group-hover:text-brand-charcoal transition-colors">KICK</span>
+          <Link to="/" className="flex items-center gap-1 group">
+            <img src="/logo.png" alt="Thaikick" className="h-12 w-auto object-contain" />
           </Link>
 
           {/* Center Links (Desktop) */}
