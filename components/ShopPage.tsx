@@ -1,15 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ShoppingBag, ShoppingCart, Plus, Minus, X } from 'lucide-react';
-import { Product, CartItem } from '../lib/types';
+import { Product, CartItem, User } from '../lib/types';
 import { getProducts } from '../services/shopService';
+import AuthModal from './AuthModal';
 
-const ShopPage: React.FC = () => {
+interface ShopPageProps {
+    user?: User | null;
+}
+
+const ShopPage: React.FC<ShopPageProps> = ({ user }) => {
     const navigate = useNavigate();
     const [products, setProducts] = useState<Product[]>([]);
     const [cart, setCart] = useState<CartItem[]>([]);
     const [isCartOpen, setIsCartOpen] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState<string>('all');
+    const [isAuthOpen, setIsAuthOpen] = useState(false);
 
     useEffect(() => {
         loadProducts();
@@ -243,7 +249,14 @@ const ShopPage: React.FC = () => {
                                     <span className="text-2xl font-black">฿{cartTotal.toLocaleString()}</span>
                                 </div>
                                 <button
-                                    onClick={() => navigate('/checkout')}
+                                    onClick={() => {
+                                        if (!user) {
+                                            setIsAuthOpen(true);
+                                        } else {
+                                            setIsCartOpen(false);
+                                            navigate('/checkout');
+                                        }
+                                    }}
                                     className="w-full bg-brand-charcoal text-white py-4 font-black uppercase hover:bg-brand-blue transition-colors shadow-[4px_4px_0px_0px_#AE3A17]"
                                 >
                                     Checkout
@@ -253,6 +266,15 @@ const ShopPage: React.FC = () => {
                     </div>
                 </div>
             )}
+
+            <AuthModal
+                isOpen={isAuthOpen}
+                onClose={() => setIsAuthOpen(false)}
+                onLoginSuccess={() => {
+                    setIsAuthOpen(false);
+                    // navigate('/checkout'); // Optional auto-redirect after login
+                }}
+            />
         </div>
     );
 };

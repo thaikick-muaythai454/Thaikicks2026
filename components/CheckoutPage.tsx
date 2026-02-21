@@ -113,6 +113,24 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ user }) => {
         }
     };
 
+    if (!user) {
+        return (
+            <div className="min-h-screen bg-brand-bone flex items-center justify-center">
+                <div className="text-center">
+                    <ShoppingBag className="w-16 h-16 mx-auto text-brand-red mb-4" />
+                    <h2 className="text-2xl font-black uppercase mb-2">Access Denied</h2>
+                    <p className="font-mono text-sm text-gray-500 mb-6">Please login to access checkout</p>
+                    <button
+                        onClick={() => navigate('/shop')}
+                        className="bg-brand-charcoal text-white px-6 py-3 font-black uppercase hover:bg-brand-blue transition-colors"
+                    >
+                        Back to Shop
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
     if (cart.length === 0) {
         return (
             <div className="min-h-screen bg-brand-bone flex items-center justify-center">
