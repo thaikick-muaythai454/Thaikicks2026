@@ -25,3 +25,4 @@ dist-ssr
 .agent
 .agent/*
 
+.agent/skill/dev-master/SKILL.md
