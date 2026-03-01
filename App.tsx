@@ -15,6 +15,7 @@ import ShopAdminPage from './components/ShopAdminPage';
 import ShopPage from './components/ShopPage';
 import CheckoutPage from './components/CheckoutPage';
 import CheckoutSuccessPage from './components/CheckoutSuccessPage';
+import TicketingPage from './components/TicketingPage';
 
 import { BOOKINGS, AFFILIATE_APPLICATIONS } from './lib/data';
 import { USERS } from './lib/auth-data';
@@ -759,6 +760,7 @@ const App: React.FC = () => {
             <Route path="/admin" element={activeUser?.role === 'admin' ? <AdminDashboard bookings={bookings} applications={applications} handleApprove={handleAffiliateApproval} /> : <HomePage user={activeUser} gyms={gyms} setBookings={setBookings} />} />
             <Route path="/analytics" element={(activeUser?.role === 'admin' || activeUser?.role === 'owner') ? <AnalyticsDashboard bookings={bookings} /> : <HomePage user={activeUser} gyms={gyms} setBookings={setBookings} />} />
             <Route path="/shop" element={<ShopPage user={activeUser} />} />
+            <Route path="/tickets" element={<TicketingPage user={activeUser} />} />
             <Route path="/checkout" element={<CheckoutPage user={activeUser} />} />
             <Route path="/checkout-success" element={<CheckoutSuccessPage />} />
             <Route path="/shop-admin" element={(activeUser?.role === 'admin' || activeUser?.role === 'owner') ? <ShopAdminPage /> : <HomePage user={activeUser} gyms={gyms} setBookings={setBookings} />} />

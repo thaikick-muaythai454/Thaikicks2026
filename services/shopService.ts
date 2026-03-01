@@ -7,6 +7,7 @@ export const getProducts = async (): Promise<Product[]> => {
     const { data, error } = await supabase
         .from('products')
         .select('*')
+        .eq('is_active', true)
         .order('created_at', { ascending: false });
 
     if (error) {
@@ -75,7 +76,19 @@ export const deleteProduct = async (id: string) => {
         .delete()
         .eq('id', id);
 
-    if (error) throw error;
+    if (error) {
+        // 23503 is PostgreSQL code for foreign key constraint violation
+        if (error.code === '23503') {
+            const { error: softDeleteError } = await supabase
+                .from('products')
+                .update({ is_active: false })
+                .eq('id', id);
+
+            if (softDeleteError) throw softDeleteError;
+        } else {
+            throw error;
+        }
+    }
 };
 
 // --- Shop Order Services ---

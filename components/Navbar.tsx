@@ -42,6 +42,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeUser, onLogout }) => {
             <Link to="/gyms" className="font-mono text-xs uppercase tracking-widest text-brand-charcoal hover:text-brand-red transition-colors">Gyms</Link>
             <Link to="/camps" className="font-mono text-xs uppercase tracking-widest text-brand-charcoal hover:text-brand-red transition-colors">Camps</Link>
             <Link to="/shop" className="font-mono text-xs uppercase tracking-widest text-brand-charcoal hover:text-brand-red transition-colors">Shop</Link>
+            <Link to="/tickets" className="font-mono text-xs uppercase tracking-widest text-brand-charcoal hover:text-brand-red transition-colors">Tickets</Link>
             {activeUser && (
               <>
                 <Link
@@ -113,6 +114,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeUser, onLogout }) => {
             <Link to="/gyms" onClick={closeMobileMenu} className="font-mono text-sm uppercase tracking-widest text-brand-charcoal hover:text-brand-red transition-colors">Gyms</Link>
             <Link to="/camps" onClick={closeMobileMenu} className="font-mono text-sm uppercase tracking-widest text-brand-charcoal hover:text-brand-red transition-colors">Camps</Link>
             <Link to="/shop" onClick={closeMobileMenu} className="font-mono text-sm uppercase tracking-widest text-brand-charcoal hover:text-brand-red transition-colors">Shop</Link>
+            <Link to="/tickets" onClick={closeMobileMenu} className="font-mono text-sm uppercase tracking-widest text-brand-charcoal hover:text-brand-red transition-colors">Tickets</Link>
             {activeUser && (
               <>
                 <Link

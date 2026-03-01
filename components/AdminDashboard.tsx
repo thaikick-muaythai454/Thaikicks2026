@@ -6,6 +6,7 @@ import { Booking, AffiliateApplication, Announcement, Gym, Trainer, TrainerSched
 import { createAnnouncement, deleteAnnouncement, getAnnouncements, createGym, updateGym, deleteGym, getGyms, createTrainer, deleteTrainer, getTrainerSchedules, createTrainerSchedule, deleteTrainerSchedule, getAllUsers, getCourses, createCourse, updateCourse, deleteCourse, getSystemSetting, updateSystemSetting, updateUserRole } from '../services/dataService';
 import { getProducts, createProduct, updateProduct, deleteProduct } from '../services/shopService';
 import ProductManagement from './ProductManagement';
+import EventManagement from './EventManagement';
 
 interface AdminDashboardProps {
   bookings: Booking[];
@@ -443,6 +444,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ bookings, applications,
         {/* Left Column: Actions */}
         <div className="space-y-12 min-w-0">
 
+          {/* Ticketing Management (Moved to top for visibility) */}
+          <EventManagement />
+
           {/* New Section: News Management */}
           <BlockTable title="Broadcast News" icon={<Megaphone className="w-4 h-4" />}>
             <div className="p-6 border-b-2 border-gray-100 bg-gray-50">
@@ -839,7 +843,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ bookings, applications,
             </div>
           </BlockTable>
 
-          {/* Affiliate Approval Section */}
           <BlockTable title="Pending Affiliates" icon={<Users className="w-4 h-4" />}>
             {applications.length === 0 ? (
               <div className="p-8 text-center font-mono text-sm text-gray-400">NO PENDING APPLICATIONS</div>
