@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Check, Shield, Lock, CreditCard, Tag, Sparkles } from 'lucide-react';
 import { Gym, User, Booking, Trainer, TrainerSchedule, Course } from '../lib/types';
 import { getReferralCode } from '../lib/affiliate';
-import { createBooking, getTrainerSchedules, getTrainerBookings, getCourses, validateAffiliateCode, getSystemSetting } from '../services/dataService';
+import { createBooking, getTrainerSchedules, getTrainerBookings, getCourses, validateAffiliateCode, getSystemSetting, createBookingCheckoutSession } from '../services/dataService';
 import generatePayload from 'promptpay-qr';
 import { QRCodeSVG } from 'qrcode.react';
 import { PROMPTPAY_NUMBER } from '../lib/constants';
@@ -195,10 +195,11 @@ const BookingPage: React.FC<BookingPageProps> = ({ gyms, user, setBookings }) =>
             const total = calculateTotal();
             const pricePerSession = type === 'course' ? total : total / count;
 
+            // 1. Create Pending Bookings
             const bookingPromises = [];
+            let mainBookingId = null;
 
             if (type === 'course') {
-                // Single Booking Record for Course
                 const bookingPayload: Partial<Booking> = {
                     gymId: gym.id,
                     gymName: gym.name,
@@ -211,16 +212,14 @@ const BookingPage: React.FC<BookingPageProps> = ({ gyms, user, setBookings }) =>
                     totalPrice: total,
                     commissionPaidTo: (referralCode && codeValid) ? referralCode : undefined,
                     commissionAmount: (referralCode && codeValid) ? Math.round(total * ((gym.affiliatePercentage || 0) / 100)) : 0,
-                    status: 'confirmed'
+                    status: paymentMethod === 'card' ? 'pending' : 'confirmed'
                 };
                 bookingPromises.push(createBooking(bookingPayload));
             } else {
-                // Loop for sessions
                 const end = endDate ? new Date(endDate) : new Date(startDate);
                 let current = new Date(start);
                 while (current <= end) {
                     const dateStr = current.toISOString().split('T')[0];
-
                     const bookingPayload: Partial<Booking> = {
                         gymId: gym.id,
                         gymName: gym.name,
@@ -235,7 +234,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ gyms, user, setBookings }) =>
                         totalPrice: Math.round(pricePerSession),
                         commissionPaidTo: (referralCode && codeValid) ? referralCode : undefined,
                         commissionAmount: (referralCode && codeValid) ? Math.round(pricePerSession * ((gym.affiliatePercentage || 0) / 100)) : 0,
-                        status: 'confirmed'
+                        status: paymentMethod === 'card' ? 'pending' : 'confirmed'
                     };
                     bookingPromises.push(createBooking(bookingPayload));
 
@@ -247,7 +246,41 @@ const BookingPage: React.FC<BookingPageProps> = ({ gyms, user, setBookings }) =>
                 }
             }
 
-            await Promise.all(bookingPromises);
+            const createdBookings = await Promise.all(bookingPromises);
+
+            // For checkout, we use the ID of the first created booking to represent the session
+            mainBookingId = createdBookings[0][0]?.id; // Assuming createBooking returns array of inserted 
+
+            if (paymentMethod === 'card' && mainBookingId) {
+                // Save fake receipt data to local storage for the success page to pick up (since it reads from shop format)
+                localStorage.setItem('thaikick_last_order', JSON.stringify({
+                    id: mainBookingId,
+                    date: new Date().toLocaleDateString(),
+                    items: [{
+                        productName: type === 'course' ? selectedCourse?.title : `${gym.name} - ${type.toUpperCase()}`,
+                        quantity: calculateSessionCount(),
+                        priceAtPurchase: Math.round(pricePerSession)
+                    }],
+                    totalAmount: total,
+                    customerEmail: user.email
+                }));
+
+                // Call Stripe Edge Function
+                const successUrl = `${window.location.origin}/#/checkout-success`;
+                const cancelUrl = window.location.href;
+
+                try {
+                    const checkoutUrl = await createBookingCheckoutSession(mainBookingId, successUrl, cancelUrl);
+                    window.location.href = checkoutUrl;
+                    return; // Prevent navigating to dashboard immediately
+                } catch (stripeErr) {
+                    console.error("Stripe Checkout Error:", stripeErr);
+                    alert("Could not connect to Stripe. Please try again.");
+                    setIsProcessing(false);
+                    return;
+                }
+            }
+
             setIsProcessing(false);
             navigate('/dashboard');
         } catch (error) {

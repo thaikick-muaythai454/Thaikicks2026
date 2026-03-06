@@ -34,6 +34,10 @@ export interface Gym {
   isFlashSale: boolean;
   flashSaleDiscount: number;
   affiliatePercentage?: number;
+  isVerified?: boolean;
+  bio?: string;
+  socialMedia?: string;
+  profilePhoto?: string;
 }
 
 export interface Booking {
@@ -53,7 +57,7 @@ export interface Booking {
   totalPrice: number;
   commissionPaidTo?: string;
   commissionAmount: number;
-  status: 'confirmed' | 'completed' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
 }
 
 export interface AffiliateApplication {

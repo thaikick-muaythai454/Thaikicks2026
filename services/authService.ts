@@ -60,6 +60,21 @@ export const signInWithGoogle = async () => {
     return data;
 };
 
+export const signInWithFacebook = async () => {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'facebook',
+        options: {
+            redirectTo: window.location.origin,
+            queryParams: {
+                prompt: 'consent',
+            },
+        }
+    });
+
+    if (error) throw error;
+    return data;
+};
+
 export const signOut = async () => {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;

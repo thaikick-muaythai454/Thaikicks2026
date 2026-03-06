@@ -430,13 +430,51 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ bookings, applications,
               Business Intelligence
             </h3>
             <p className="font-mono text-xs text-brand-blue group-hover:text-brand-charcoal/70">
-              View deep insights, revenue trends, and top performance metrics.
+              View deep insights, revenue trends, and download CSV reports.
             </p>
           </div>
 
-          <a href="#/analytics" className="px-8 py-4 bg-brand-red text-white font-black uppercase text-sm border-2 border-brand-red hover:bg-transparent hover:text-brand-red hover:border-brand-red transition-all whitespace-nowrap">
-            Launch Analytics Console
-          </a>
+          <div className="flex gap-4">
+            <button
+              onClick={() => {
+                const csvRows = [];
+                // Headers
+                csvRows.push(['Booking ID', 'Date', 'Type', 'Status', 'Gym Name', 'User Name', 'Trainer Name', 'Total Price', 'Commission Amount'].join(','));
+
+                // Rows
+                bookings.forEach(b => {
+                  csvRows.push([
+                    b.id,
+                    b.date,
+                    b.type,
+                    b.status,
+                    `"${b.gymName}"`,
+                    `"${b.userName}"`,
+                    `"${b.trainerName || ''}"`,
+                    b.totalPrice,
+                    b.commissionAmount || 0
+                  ].join(','));
+                });
+
+                const csvString = csvRows.join('\n');
+                const blob = new Blob([csvString], { type: 'text/csv' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.setAttribute('hidden', '');
+                a.setAttribute('href', url);
+                a.setAttribute('download', `bookings_export_${new Date().toISOString().split('T')[0]}.csv`);
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+              }}
+              className="px-6 py-4 bg-brand-charcoal text-white font-black uppercase text-sm border-2 border-white hover:bg-white hover:text-brand-charcoal transition-all whitespace-nowrap"
+            >
+              Export CSV
+            </button>
+            <a href="#/analytics" className="px-8 py-4 bg-brand-red text-white font-black uppercase text-sm border-2 border-brand-red hover:bg-transparent hover:text-brand-red hover:border-brand-red transition-all whitespace-nowrap">
+              Launch Analytics Console
+            </a>
+          </div>
         </div>
       </div>
 
@@ -704,23 +742,46 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ bookings, applications,
 
             <div className="max-h-[300px] overflow-y-auto divide-y divide-gray-100">
               {gyms.map(g => (
-                <div key={g.id} className="p-4 flex justify-between items-center hover:bg-gray-50 group">
+                <div key={g.id} className={`p-4 flex justify-between items-center hover:bg-gray-50 group ${g.isVerified ? '' : 'bg-red-50/50'}`}>
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-gray-200 shrink-0 overflow-hidden border border-gray-300">
                       {g.images?.[0] && <img src={g.images[0]} className="w-full h-full object-cover" />}
                     </div>
                     <div>
-                      <div className="font-bold text-sm uppercase text-brand-charcoal">{g.name}</div>
+                      <div className="font-bold text-sm uppercase text-brand-charcoal flex items-center gap-2">
+                        {g.name}
+                        {g.isVerified ? (
+                          <span title="Verified"><Check className="w-3 h-3 text-green-500" /></span>
+                        ) : (
+                          <span className="bg-red-500 text-white text-[9px] px-1 rounded-sm uppercase tracking-wider">Unverified</span>
+                        )}
+                      </div>
                       <div className="font-mono text-xs text-gray-400">{g.location} • ฿{g.basePrice}</div>
                     </div>
                   </div>
-                  <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => { setEditingGym(g); setIsGymFormOpen(true); }} className="p-2 hover:bg-blue-100 text-brand-blue rounded">
-                      <Edit className="w-4 h-4" />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={async () => {
+                        try {
+                          await updateGym(g.id, { isVerified: !g.isVerified });
+                          await loadGyms();
+                        } catch (err) {
+                          console.error(err);
+                          alert("Failed to update gym verification status");
+                        }
+                      }}
+                      className={`font-mono text-[10px] font-bold uppercase px-2 py-1 transition-colors ${g.isVerified ? 'text-gray-500 border border-gray-300 hover:bg-gray-100' : 'bg-green-500 text-white hover:bg-green-600'}`}
+                    >
+                      {g.isVerified ? 'Revoke' : 'Verify'}
                     </button>
-                    <button onClick={() => handleDeleteGym(g.id)} className="p-2 hover:bg-red-100 text-brand-red rounded">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => { setEditingGym(g); setIsGymFormOpen(true); }} className="p-2 hover:bg-blue-100 text-brand-blue rounded">
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => handleDeleteGym(g.id)} className="p-2 hover:bg-red-100 text-brand-red rounded">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}

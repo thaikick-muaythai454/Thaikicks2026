@@ -16,6 +16,9 @@ import ShopPage from './components/ShopPage';
 import CheckoutPage from './components/CheckoutPage';
 import CheckoutSuccessPage from './components/CheckoutSuccessPage';
 import TicketingPage from './components/TicketingPage';
+import NotFoundPage from './components/NotFoundPage';
+import LegalPage from './components/LegalPage';
+import CookieBanner from './components/CookieBanner';
 
 import { BOOKINGS, AFFILIATE_APPLICATIONS } from './lib/data';
 import { USERS } from './lib/auth-data';
@@ -125,6 +128,9 @@ const HomePage: React.FC<{ user: User | null; gyms: Gym[]; setBookings: any; cat
   };
 
   const filteredGyms = gyms.filter(gym => {
+    // Only show verified gyms in search results
+    if (gym.isVerified === false) return false;
+
     const matchLocation = gym.location.toLowerCase().includes(locationInput.toLowerCase()) || gym.name.toLowerCase().includes(locationInput.toLowerCase());
     const matchDiscipline = disciplineInput === '' || gym.trainers.some(t => t.specialty.toLowerCase().includes(disciplineInput.toLowerCase()));
     const matchCategory = !categoryFilter || gym.category === categoryFilter;
@@ -134,13 +140,31 @@ const HomePage: React.FC<{ user: User | null; gyms: Gym[]; setBookings: any; cat
   return (
     <div className="max-w-[1440px] mx-auto px-4 sm:px-10 pb-20">
       {/* Hero */}
-      <div className="pt-20 lg:pt-32 pb-16 grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr] gap-10 items-end">
+      <div className="pt-32 lg:pt-44 pb-16 grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr] gap-10 items-end">
         <div>
           <Mono className="text-brand-red block mb-6">Bangkok • Phuket • Chiang Mai</Mono>
           <h1 className="text-[clamp(3.5rem,8vw,8rem)] font-black text-brand-charcoal leading-[0.9] tracking-tight">
             {categoryFilter === 'gym' ? 'ELITE GYMS' : categoryFilter === 'camp' ? 'AUTHENTIC CAMPS' : 'FORGE YOUR'}<br />
             <span className="text-brand-red">{categoryFilter ? 'SELECTION' : 'LEGACY.'}</span>
           </h1>
+          <div className="flex flex-col sm:flex-row gap-4 mt-8">
+            <button className="bg-brand-red text-white font-black uppercase text-lg px-8 py-4 hover:bg-brand-charcoal transition-colors whitespace-nowrap" onClick={() => {
+              const element = document.getElementById('gyms');
+              if (element) element.scrollIntoView({ behavior: 'smooth' });
+            }}>
+              BOOK YOUR TRAINING NOW
+            </button>
+            <button className="bg-brand-blue text-white font-black uppercase text-lg px-8 py-4 hover:bg-brand-charcoal transition-colors whitespace-nowrap" onClick={() => {
+              const element = document.getElementById('gyms');
+              if (element) element.scrollIntoView({ behavior: 'smooth' });
+            }}>
+              EXPLORE GYMS
+            </button>
+          </div>
+          <div className="mt-4 font-mono text-xs text-brand-charcoal opacity-70 flex items-center gap-2 flex-wrap">
+            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+            Verified Gyms | Secure Stripe Payment | Instant Confirmation
+          </div>
         </div>
         <div className="font-mono text-sm leading-relaxed border-l-2 border-brand-blue pl-8 text-brand-charcoal opacity-80 mb-4 lg:mb-0">
           The world's most curated platform for authentic Muay Thai training.
@@ -196,6 +220,35 @@ const HomePage: React.FC<{ user: User | null; gyms: Gym[]; setBookings: any; cat
         >
           Search
         </button>
+      </div>
+
+      {/* How It Works Section */}
+      <div className="py-24 border-t-2 border-brand-charcoal/10 mt-20">
+        <div className="mb-12 text-center">
+          <Mono className="text-brand-blue mb-4">The Process</Mono>
+          <h2 className="text-4xl font-black uppercase text-brand-charcoal">How ThaiKicks Works</h2>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
+          <div className="hidden md:block absolute top-12 left-[10%] right-[10%] h-1 bg-brand-charcoal/10 -z-10"></div>
+
+          <div className="bg-white border-2 border-brand-charcoal p-8 flex flex-col items-center text-center shadow-[6px_6px_0px_#1A1A1A] relative z-10 transition-transform hover:-translate-y-1">
+            <div className="w-16 h-16 bg-brand-charcoal text-white rounded-full flex items-center justify-center font-black text-2xl mb-6 shadow-sm">1</div>
+            <h3 className="font-black text-xl uppercase mb-3 text-brand-charcoal">Choose Your Gym</h3>
+            <p className="font-mono text-xs text-gray-500 leading-relaxed">Filter by location, discipline, and vibe. From gritty professional camps to modern fitness facilities.</p>
+          </div>
+
+          <div className="bg-white border-2 border-brand-charcoal p-8 flex flex-col items-center text-center shadow-[6px_6px_0px_#1A1A1A] relative z-10 transition-transform hover:-translate-y-1">
+            <div className="w-16 h-16 bg-brand-red text-white rounded-full flex items-center justify-center font-black text-2xl mb-6 shadow-sm">2</div>
+            <h3 className="font-black text-xl uppercase mb-3 text-brand-charcoal">Select Your Date</h3>
+            <p className="font-mono text-xs text-gray-500 leading-relaxed">Book your session instantly through our secure gateway. Lock in spots at high-demand camps.</p>
+          </div>
+
+          <div className="bg-white border-2 border-brand-charcoal p-8 flex flex-col items-center text-center shadow-[6px_6px_0px_#1A1A1A] relative z-10 transition-transform hover:-translate-y-1">
+            <div className="w-16 h-16 bg-brand-blue text-white rounded-full flex items-center justify-center font-black text-2xl mb-6 shadow-sm">3</div>
+            <h3 className="font-black text-xl uppercase mb-3 text-brand-charcoal">Train Like A Fighter</h3>
+            <p className="font-mono text-xs text-gray-500 leading-relaxed">Receive your instant confirmation barcode. Show up, wrap your hands, and forge your legacy.</p>
+          </div>
+        </div>
       </div>
 
       {/* Grid */}
@@ -466,9 +519,14 @@ const CustomerDashboard: React.FC<{ user: User; bookings: Booking[]; requestAffi
             <Mono className="text-brand-bone opacity-70">Affiliate Network</Mono>
 
             <div className="mt-8 mb-10 relative z-10">
-              <div className="text-5xl font-black">
+              <div className="text-5xl font-black mb-2">
                 {user.affiliateStatus === 'active' ? `฿${user.affiliateEarnings}` : 'INACTIVE'}
               </div>
+              {user.affiliateStatus === 'active' && (
+                <div className="text-sm font-mono text-brand-bone opacity-80 mb-4">
+                  Pending Payout: ฿0
+                </div>
+              )}
               <div className="font-mono text-xs text-brand-red mt-2 uppercase font-bold tracking-widest">{user.affiliateStatus} STATUS</div>
             </div>
 
@@ -479,8 +537,24 @@ const CustomerDashboard: React.FC<{ user: User; bookings: Booking[]; requestAffi
             )}
 
             {user.affiliateStatus === 'active' && (
-              <div className="p-4 bg-white/10 border border-white/20 font-mono text-xs break-all relative z-10">
-                ?ref={user.affiliateCode}
+              <div className="relative z-10 mt-4">
+                <label className="block text-xs font-mono text-brand-bone mb-2 uppercase opacity-70">Your Referral Link</label>
+                <div className="flex">
+                  <input
+                    readOnly
+                    value={`https://thaikicks.com/?ref=${user.affiliateCode}`}
+                    className="w-full bg-black/30 border border-white/20 p-3 font-mono text-xs text-white outline-none"
+                  />
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(`https://thaikicks.com/?ref=${user.affiliateCode}`);
+                      alert('Referral link copied to clipboard!');
+                    }}
+                    className="bg-brand-red text-white font-bold uppercase text-xs px-4 hover:bg-white hover:text-brand-red border border-brand-red transition-colors"
+                  >
+                    Copy
+                  </button>
+                </div>
               </div>
             )}
 
@@ -735,7 +809,7 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#F9F9F9]">
         <div className="font-black text-3xl text-brand-charcoal animate-pulse">
-          <img src="/logo.png" alt="Thaikick" className="h-16 w-auto object-contain" />
+          <img src="/tk-logo.png" alt="Thaikick" className="h-16 w-auto object-contain" />
         </div>
         <Mono className="text-brand-blue mt-4">Authenticating...</Mono>
       </div>
@@ -765,14 +839,36 @@ const App: React.FC = () => {
             <Route path="/checkout-success" element={<CheckoutSuccessPage />} />
             <Route path="/shop-admin" element={(activeUser?.role === 'admin' || activeUser?.role === 'owner') ? <ShopAdminPage /> : <HomePage user={activeUser} gyms={gyms} setBookings={setBookings} />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
+
+            {/* Legal Pages */}
+            <Route path="/privacy-policy" element={<LegalPage title="Privacy Policy" />} />
+            <Route path="/terms-of-service" element={<LegalPage title="Terms of Service" />} />
+            <Route path="/refund-policy" element={<LegalPage title="Refund Policy" />} />
+            <Route path="/cancellation-policy" element={<LegalPage title="Cancellation Policy" />} />
+
+            {/* 404 Catch All */}
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </main>
+
+        {/* Verified by ThaiKicks Trust Badge */}
+        <div className="bg-brand-blue py-12 border-y-2 border-brand-charcoal">
+          <div className="max-w-[1440px] mx-auto px-4 sm:px-10 flex flex-col sm:flex-row items-center justify-center gap-6 text-white text-center sm:text-left">
+            <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shrink-0 shadow-[4px_4px_0px_#1A1A1A]">
+              <svg className="w-8 h-8 text-brand-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>
+            </div>
+            <div>
+              <h3 className="text-2xl font-black uppercase tracking-wide">Verified by ThaiKicks</h3>
+              <p className="font-mono text-sm opacity-80 mt-1 max-w-xl">Every camp on our platform goes through a rigorous on-site verification process to ensure authentic training, safe environments, and fair pricing.</p>
+            </div>
+          </div>
+        </div>
 
         <footer className="bg-brand-charcoal text-white py-24">
           <div className="max-w-[1440px] mx-auto px-4 sm:px-10 grid grid-cols-1 md:grid-cols-4 gap-12">
             <div className="md:col-span-2">
               <Link to="/" className="flex items-center gap-1 mb-6">
-                <img src="/logo.png" alt="Thaikick" className="h-10 w-auto object-contain" />
+                <img src="/tk-logo.png" alt="Thaikick" className="h-10 w-auto object-contain" />
               </Link>
               <p className="font-mono text-sm opacity-50 max-w-xs leading-relaxed">
                 Standardizing the Muay Thai experience for the global community.
@@ -789,19 +885,20 @@ const App: React.FC = () => {
               </ul>
             </div>
             <div>
-              <h4 className="font-mono text-xs font-bold uppercase mb-6 text-brand-bone">Support</h4>
+              <h4 className="font-mono text-xs font-bold uppercase mb-6 text-brand-bone">Support & Legal</h4>
               <ul className="font-mono text-sm opacity-60 space-y-3">
-                <li>Visa Info</li>
-                <li>Insurance</li>
-                <li>Partner with us</li>
-                <li>Contact</li>
+                <li><Link to="/privacy-policy" className="hover:text-brand-red transition-colors">Privacy Policy</Link></li>
+                <li><Link to="/terms-of-service" className="hover:text-brand-red transition-colors">Terms of Service</Link></li>
+                <li><Link to="/refund-policy" className="hover:text-brand-red transition-colors">Refund Policy</Link></li>
+                <li><Link to="/cancellation-policy" className="hover:text-brand-red transition-colors">Cancellation Policy</Link></li>
+                <li><Link to="/contact" className="hover:text-brand-red transition-colors">Contact</Link></li>
               </ul>
             </div>
           </div>
         </footer>
 
         <Chatbot />
-
+        <CookieBanner />
 
       </div>
     </HashRouter>

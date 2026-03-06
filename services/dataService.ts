@@ -39,7 +39,11 @@ export const getGyms = async (): Promise<Gym[]> => {
         })),
         isFlashSale: gym.is_flash_sale,
         flashSaleDiscount: gym.flash_sale_discount,
-        affiliatePercentage: gym.affiliate_percentage
+        affiliatePercentage: gym.affiliate_percentage,
+        isVerified: gym.is_verified,
+        bio: gym.bio,
+        socialMedia: gym.social_media,
+        profilePhoto: gym.profile_photo
     })) as unknown as Gym[];
 };
 
@@ -76,7 +80,11 @@ export const getGymById = async (id: string): Promise<Gym | null> => {
         })),
         isFlashSale: data.is_flash_sale,
         flashSaleDiscount: data.flash_sale_discount,
-        affiliatePercentage: data.affiliate_percentage
+        affiliatePercentage: data.affiliate_percentage,
+        isVerified: data.is_verified,
+        bio: data.bio,
+        socialMedia: data.social_media,
+        profilePhoto: data.profile_photo
     } as unknown as Gym;
 };
 
@@ -90,7 +98,11 @@ export const createGym = async (gym: Partial<Gym>) => {
         images: gym.images || [],
         base_price: gym.basePrice ?? 0,
         owner_id: gym.ownerId, // Optional, might be null for admin created
-        affiliate_percentage: gym.affiliatePercentage || 0
+        affiliate_percentage: gym.affiliatePercentage || 0,
+        is_verified: gym.isVerified ?? false,
+        bio: gym.bio || '',
+        social_media: gym.socialMedia || '',
+        profile_photo: gym.profilePhoto || ''
     };
 
     const { data, error } = await supabase
@@ -112,6 +124,10 @@ export const updateGym = async (id: string, gym: Partial<Gym>) => {
     if (gym.images) dbGym.images = gym.images;
     if (gym.basePrice !== undefined) dbGym.base_price = gym.basePrice;
     if (gym.affiliatePercentage !== undefined) dbGym.affiliate_percentage = gym.affiliatePercentage;
+    if (gym.isVerified !== undefined) dbGym.is_verified = gym.isVerified;
+    if (gym.bio !== undefined) dbGym.bio = gym.bio;
+    if (gym.socialMedia !== undefined) dbGym.social_media = gym.socialMedia;
+    if (gym.profilePhoto !== undefined) dbGym.profile_photo = gym.profilePhoto;
 
     // Safety check just in case
     if (Object.keys(dbGym).length === 0) return;
@@ -676,4 +692,23 @@ export const deleteCourse = async (id: string) => {
         .eq('id', id);
 
     if (error) throw error;
+};
+
+// ----------------------------------------------------------------------------
+// STRIPE CHECKOUT INTEGRATION
+// ----------------------------------------------------------------------------
+export const createBookingCheckoutSession = async (bookingId: string, successUrl: string, cancelUrl: string) => {
+    const { data, error } = await supabase.functions.invoke('stripe-checkout', {
+        body: {
+            orderId: bookingId,
+            type: 'booking',
+            successUrl,
+            cancelUrl
+        }
+    });
+
+    if (error) throw error;
+    if (data?.error) throw new Error(data.error);
+
+    return data.url;
 };

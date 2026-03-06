@@ -19,42 +19,65 @@ serve(async (req) => {
     }
 
     try {
-        const { orderId, successUrl, cancelUrl } = await req.json();
+        const { orderId, successUrl, cancelUrl, type = 'shop' } = await req.json();
 
-        // 1. Get the order from database to verify amount
         const supabase = createClient(
             Deno.env.get("SUPABASE_URL") ?? "",
             Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
         );
 
-        const { data: order, error: orderError } = await supabase
-            .from("shop_orders")
-            .select(`
-        *,
-        items:shop_order_items(
-          quantity,
-          price_at_purchase,
-          products(name)
-        )
-      `)
-            .eq("id", orderId)
-            .single();
+        let line_items = [];
 
-        if (orderError || !order) {
-            throw new Error(`Order not found: ${orderId}`);
-        }
+        if (type === 'booking') {
+            // Processing a Booking
+            const { data: booking, error: bookingError } = await supabase
+                .from("bookings")
+                .select("*")
+                .eq("id", orderId)
+                .single();
 
-        // 2. Create line items for Stripe
-        const line_items = order.items.map((item: any) => ({
-            price_data: {
-                currency: "thb",
-                product_data: {
-                    name: item.products?.name || "Product",
+            if (bookingError || !booking) throw new Error(`Booking not found: ${orderId}`);
+
+            line_items = [{
+                price_data: {
+                    currency: "thb",
+                    product_data: {
+                        name: `Booking at ${booking.gym_name}`,
+                        description: `${booking.type.toUpperCase()} - ${booking.date}`,
+                    },
+                    unit_amount: Math.round(booking.total_price * 100), // in satang
                 },
-                unit_amount: Math.round(item.price_at_purchase * 100), // in satang
-            },
-            quantity: item.quantity,
-        }));
+                quantity: 1,
+            }];
+
+        } else {
+            // Processing a Shop Order
+            const { data: order, error: orderError } = await supabase
+                .from("shop_orders")
+                .select(`
+                    *,
+                    items:shop_order_items(
+                        quantity,
+                        price_at_purchase,
+                        products(name)
+                    )
+                `)
+                .eq("id", orderId)
+                .single();
+
+            if (orderError || !order) throw new Error(`Shop Order not found: ${orderId}`);
+
+            line_items = order.items.map((item: any) => ({
+                price_data: {
+                    currency: "thb",
+                    product_data: {
+                        name: item.products?.name || "Product",
+                    },
+                    unit_amount: Math.round(item.price_at_purchase * 100), // in satang
+                },
+                quantity: item.quantity,
+            }));
+        }
 
         // 3. Create Stripe Checkout Session
         const session = await stripe.checkout.sessions.create({
@@ -65,14 +88,19 @@ serve(async (req) => {
             cancel_url: cancelUrl,
             metadata: {
                 order_id: orderId,
+                type: type // Important for webhook
             },
         });
 
-        // 4. Save session ID to order
-        await supabase
-            .from("shop_orders")
-            .update({ stripe_session_id: session.id })
-            .eq("id", orderId);
+        // 4. Save session ID
+        if (type === 'booking') {
+            // Wait until webhook to finalize, but could save session id if we had a column
+        } else {
+            await supabase
+                .from("shop_orders")
+                .update({ stripe_session_id: session.id })
+                .eq("id", orderId);
+        }
 
         return new Response(JSON.stringify({ url: session.url }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -159,9 +159,20 @@ const OwnerDashboard: React.FC<OwnerDashboardProps> = ({ user, gyms, updateGym, 
                     <Mono className="text-brand-blue">Gym Owner Console</Mono>
                     <h1 className="text-3xl md:text-4xl font-black uppercase text-brand-charcoal mt-2">{myGym.name}</h1>
                 </div>
-                <div className="flex items-center gap-2 px-4 py-2 bg-brand-charcoal text-white font-mono text-xs font-bold uppercase w-fit">
-                    <Shield className="w-4 h-4" />
-                    Owner Access
+                <div className="flex flex-col gap-2 items-end">
+                    <div className="flex items-center gap-2 px-4 py-2 bg-brand-charcoal text-white font-mono text-xs font-bold uppercase w-fit">
+                        <Shield className="w-4 h-4" />
+                        Owner Access
+                    </div>
+                    {myGym.isVerified ? (
+                        <div className="flex items-center gap-1 font-mono text-[10px] uppercase font-bold text-green-600 bg-green-50 px-2 py-1 border border-green-200">
+                            <Check className="w-3 h-3" /> System Verified
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-1 font-mono text-[10px] uppercase font-bold text-orange-600 bg-orange-50 px-2 py-1 border border-orange-200">
+                            <Activity className="w-3 h-3 animate-pulse" /> Pending Verification
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -284,6 +295,9 @@ const OwnerDashboard: React.FC<OwnerDashboardProps> = ({ user, gyms, updateGym, 
                                         </div>
                                         <div className="grid grid-cols-1 gap-4">
                                             <input className="border p-2 text-xs w-full" value={editingGym?.location} onChange={e => setEditingGym({ ...editingGym, location: e.target.value })} placeholder="Location" />
+                                            <input className="border p-2 text-xs w-full" value={editingGym?.profilePhoto || ''} onChange={e => setEditingGym({ ...editingGym, profilePhoto: e.target.value })} placeholder="Profile Photo URL (Overrides first image as avatar)" />
+                                            <input className="border p-2 text-xs w-full" value={editingGym?.socialMedia || ''} onChange={e => setEditingGym({ ...editingGym, socialMedia: e.target.value })} placeholder="Social Media Link (Instagram/Facebook)" />
+                                            <textarea className="border p-2 text-xs w-full h-20" value={editingGym?.bio || ''} onChange={e => setEditingGym({ ...editingGym, bio: e.target.value })} placeholder="Detailed Gym Bio / History..." />
                                         </div>
 
                                         {/* Simple Trainer List in Edit Mode */}

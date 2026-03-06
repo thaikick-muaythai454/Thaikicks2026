@@ -30,11 +30,11 @@ const Navbar: React.FC<NavbarProps> = ({ activeUser, onLogout }) => {
 
   return (
     <>
-      <nav className="h-[100px] border-b border-brand-charcoal/10 sticky top-0 bg-[#F9F9F9]/90 backdrop-blur-md z-40">
+      <nav className="h-[200px] border-b border-brand-charcoal/10 sticky top-0 bg-[#F9F9F9]/90 backdrop-blur-md z-40">
         <div className="max-w-[1440px] mx-auto px-4 sm:px-10 h-full flex items-center justify-between">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-1 group" onClick={closeMobileMenu}>
-            <img src="/logo.png" alt="Thaikick" className="h-12 w-auto object-contain" />
+          <Link to="/" className="flex items-center gap-1 group -ml-2" onClick={closeMobileMenu}>
+            <img src="/tk-logo.png" alt="Thaikick" className="h-[140px] w-auto object-contain" />
           </Link>
 
           {/* Center Links (Desktop) */}
@@ -110,7 +110,7 @@ const Navbar: React.FC<NavbarProps> = ({ activeUser, onLogout }) => {
 
         {/* Mobile Menu Dropdown */}
         {isMobileMenuOpen && (
-          <div className="md:hidden absolute top-[100px] left-0 w-full bg-white border-b border-gray-200 shadow-lg flex flex-col px-4 py-4 space-y-4">
+          <div className="md:hidden absolute top-full left-0 w-full bg-white border-b border-gray-200 shadow-lg flex flex-col px-4 py-4 space-y-4">
             <Link to="/gyms" onClick={closeMobileMenu} className="font-mono text-sm uppercase tracking-widest text-brand-charcoal hover:text-brand-red transition-colors">Gyms</Link>
             <Link to="/camps" onClick={closeMobileMenu} className="font-mono text-sm uppercase tracking-widest text-brand-charcoal hover:text-brand-red transition-colors">Camps</Link>
             <Link to="/shop" onClick={closeMobileMenu} className="font-mono text-sm uppercase tracking-widest text-brand-charcoal hover:text-brand-red transition-colors">Shop</Link>
