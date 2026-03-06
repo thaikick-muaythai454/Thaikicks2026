@@ -8,6 +8,10 @@ const ShopAdminPage: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'products' | 'orders'>('products');
     const [orders, setOrders] = useState<ShopOrder[]>([]);
 
+    // Filters
+    const [filterStatus, setFilterStatus] = useState<string>('all');
+    const [searchQuery, setSearchQuery] = useState<string>('');
+
     useEffect(() => {
         if (activeTab === 'orders') {
             loadOrders();
@@ -68,29 +72,27 @@ const ShopAdminPage: React.FC = () => {
 
             {/* Tab Navigation */}
             <div className="bg-white border-b-2 border-brand-charcoal">
-                <div className="max-w-[1440px] mx-auto px-4 sm:px-10">
-                    <div className="flex gap-1">
-                        <button
-                            onClick={() => setActiveTab('products')}
-                            className={`px-6 py-4 font-black uppercase text-sm border-b-4 transition-all ${activeTab === 'products'
-                                ? 'border-brand-red text-brand-charcoal bg-brand-bone'
-                                : 'border-transparent text-gray-400 hover:text-brand-charcoal hover:bg-gray-50'
-                                }`}
-                        >
-                            <Package className="w-4 h-4 inline-block mr-2" />
-                            Products
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('orders')}
-                            className={`px-6 py-4 font-black uppercase text-sm border-b-4 transition-all ${activeTab === 'orders'
-                                ? 'border-brand-red text-brand-charcoal bg-brand-bone'
-                                : 'border-transparent text-gray-400 hover:text-brand-charcoal hover:bg-gray-50'
-                                }`}
-                        >
-                            <ShoppingBag className="w-4 h-4 inline-block mr-2" />
-                            Orders
-                        </button>
-                    </div>
+                <div className="max-w-[1440px] mx-auto px-4 sm:px-10 flex border-l-2 border-r-2 border-brand-charcoal">
+                    <button
+                        onClick={() => setActiveTab('products')}
+                        className={`px-6 py-4 font-black uppercase text-sm border-r-2 border-brand-charcoal transition-all ${activeTab === 'products'
+                            ? 'bg-brand-red text-white'
+                            : 'bg-brand-bone text-brand-charcoal hover:bg-gray-200'
+                            }`}
+                    >
+                        <Package className="w-4 h-4 inline-block mr-2" />
+                        Products
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('orders')}
+                        className={`px-6 py-4 font-black uppercase text-sm border-r-2 border-brand-charcoal transition-all ${activeTab === 'orders'
+                            ? 'bg-brand-red text-white'
+                            : 'bg-brand-bone text-brand-charcoal hover:bg-gray-200'
+                            }`}
+                    >
+                        <ShoppingBag className="w-4 h-4 inline-block mr-2" />
+                        Orders
+                    </button>
                 </div>
             </div>
 
@@ -102,82 +104,113 @@ const ShopAdminPage: React.FC = () => {
                     </div>
                 )}
 
-                {activeTab === 'orders' && (
-                    <div className="animate-reveal">
-                        <div className="border-2 border-brand-charcoal bg-white">
-                            <div className="p-4 border-b-2 border-brand-charcoal bg-brand-bone">
-                                <h3 className="font-black uppercase tracking-wide text-sm flex items-center gap-2">
-                                    <ShoppingBag className="w-4 h-4" />
-                                    Shop Orders ({orders.length})
-                                </h3>
-                            </div>
-                            {orders.length === 0 ? (
-                                <div className="p-8 text-center">
-                                    <ShoppingBag className="w-12 h-12 mx-auto text-gray-300 mb-3" />
-                                    <p className="font-mono text-sm text-gray-400">No orders yet</p>
+                {activeTab === 'orders' && (() => {
+                    const filteredOrders = orders.filter(order => {
+                        const matchStatus = filterStatus === 'all' || order.status === filterStatus;
+                        const contactDetails = order.contactDetails ? JSON.parse(order.contactDetails) : {};
+                        const searchString = `${order.id} ${contactDetails.name || ''} ${contactDetails.email || ''}`.toLowerCase();
+                        const matchSearch = searchString.includes(searchQuery.toLowerCase());
+                        return matchStatus && matchSearch;
+                    });
+
+                    return (
+                        <div className="animate-reveal">
+                            <div className="border-2 border-brand-charcoal bg-white">
+                                <div className="p-4 border-b-2 border-brand-charcoal bg-brand-bone flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                    <h3 className="font-black uppercase tracking-wide text-sm flex items-center gap-2">
+                                        <ShoppingBag className="w-4 h-4" />
+                                        Shop Orders ({filteredOrders.length} / {orders.length})
+                                    </h3>
+                                    <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+                                        <input
+                                            type="text"
+                                            placeholder="SEARCH ID, NAME, EMAIL"
+                                            className="border-2 border-brand-charcoal px-3 py-2 font-mono text-xs w-full sm:w-64 focus:outline-none focus:border-brand-charcoal focus:ring-1 focus:ring-brand-charcoal"
+                                            value={searchQuery}
+                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                        />
+                                        <select
+                                            className="border-2 border-brand-charcoal px-3 py-2 font-mono text-xs focus:outline-none focus:border-brand-charcoal focus:ring-1 focus:ring-brand-charcoal uppercase bg-white cursor-pointer"
+                                            value={filterStatus}
+                                            onChange={(e) => setFilterStatus(e.target.value)}
+                                        >
+                                            <option value="all">ALL STATUS</option>
+                                            <option value="pending">PENDING</option>
+                                            <option value="paid">PAID</option>
+                                            <option value="shipped">SHIPPED</option>
+                                            <option value="delivered">DELIVERED</option>
+                                            <option value="cancelled">CANCELLED</option>
+                                        </select>
+                                    </div>
                                 </div>
-                            ) : (
-                                <div className="divide-y divide-gray-200">
-                                    {orders.map(order => {
-                                        const contactDetails = order.contactDetails ? JSON.parse(order.contactDetails) : {};
-                                        return (
-                                            <div key={order.id} className="p-6 hover:bg-gray-50">
-                                                <div className="flex items-start justify-between mb-4">
-                                                    <div>
-                                                        <div className="font-mono text-xs text-gray-400">Order #{order.id.slice(0, 8)}</div>
-                                                        <div className="font-bold text-sm mt-1">{contactDetails.name || 'N/A'}</div>
-                                                        <div className="font-mono text-xs text-gray-500">{contactDetails.email}</div>
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <div className="text-xl font-black">฿{order.totalAmount.toLocaleString()}</div>
-                                                        <div className="font-mono text-xs text-gray-400 mt-1">
-                                                            {new Date(order.createdAt).toLocaleDateString()}
+                                {filteredOrders.length === 0 ? (
+                                    <div className="p-8 text-center">
+                                        <ShoppingBag className="w-12 h-12 mx-auto text-gray-300 mb-3" />
+                                        <p className="font-mono text-sm text-gray-400">No orders yet</p>
+                                    </div>
+                                ) : (
+                                    <div className="divide-y divide-brand-charcoal">
+                                        {filteredOrders.map(order => {
+                                            const contactDetails = order.contactDetails ? JSON.parse(order.contactDetails) : {};
+                                            return (
+                                                <div key={order.id} className="p-6 hover:bg-gray-50">
+                                                    <div className="flex items-start justify-between mb-4">
+                                                        <div>
+                                                            <div className="font-mono text-xs text-gray-400">Order #{order.id.slice(0, 8)}</div>
+                                                            <div className="font-bold text-sm mt-1">{contactDetails.name || 'N/A'}</div>
+                                                            <div className="font-mono text-xs text-gray-500">{contactDetails.email}</div>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <div className="text-xl font-black">฿{order.totalAmount.toLocaleString()}</div>
+                                                            <div className="font-mono text-xs text-gray-400 mt-1">
+                                                                {new Date(order.createdAt).toLocaleDateString()}
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                </div>
 
-                                                {order.items && order.items.length > 0 && (
-                                                    <div className="bg-gray-50 p-3 mb-3 space-y-2">
-                                                        {order.items.map((item, idx) => (
-                                                            <div key={idx} className="flex justify-between font-mono text-xs">
-                                                                <span>{item.quantity}x Product</span>
-                                                                <span>฿{item.priceAtPurchase.toLocaleString()}</span>
-                                                            </div>
-                                                        ))}
+                                                    {order.items && order.items.length > 0 && (
+                                                        <div className="bg-gray-50 p-3 mb-3 space-y-2">
+                                                            {order.items.map((item, idx) => (
+                                                                <div key={idx} className="flex justify-between font-mono text-xs">
+                                                                    <span>{item.quantity}x Product</span>
+                                                                    <span>฿{item.priceAtPurchase.toLocaleString()}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+
+                                                    {order.shippingAddress && (
+                                                        <div className="mb-3">
+                                                            <div className="font-mono text-xs font-bold text-gray-600 uppercase mb-1">Shipping Address</div>
+                                                            <div className="font-mono text-xs text-gray-500">{order.shippingAddress}</div>
+                                                        </div>
+                                                    )}
+
+                                                    <div className="flex items-center gap-3">
+                                                        <span className={`px-3 py-1 text-xs font-bold uppercase border ${getStatusColor(order.status)}`}>
+                                                            {order.status}
+                                                        </span>
+                                                        <select
+                                                            value={order.status}
+                                                            onChange={(e) => handleStatusUpdate(order.id, e.target.value as ShopOrder['status'])}
+                                                            className="border border-gray-300 px-3 py-1 text-xs font-mono uppercase focus:outline-none focus:border-brand-blue"
+                                                        >
+                                                            <option value="pending">Pending</option>
+                                                            <option value="paid">Paid</option>
+                                                            <option value="shipped">Shipped</option>
+                                                            <option value="delivered">Delivered</option>
+                                                            <option value="cancelled">Cancelled</option>
+                                                        </select>
                                                     </div>
-                                                )}
-
-                                                {order.shippingAddress && (
-                                                    <div className="mb-3">
-                                                        <div className="font-mono text-xs font-bold text-gray-600 uppercase mb-1">Shipping Address</div>
-                                                        <div className="font-mono text-xs text-gray-500">{order.shippingAddress}</div>
-                                                    </div>
-                                                )}
-
-                                                <div className="flex items-center gap-3">
-                                                    <span className={`px-3 py-1 text-xs font-bold uppercase border ${getStatusColor(order.status)}`}>
-                                                        {order.status}
-                                                    </span>
-                                                    <select
-                                                        value={order.status}
-                                                        onChange={(e) => handleStatusUpdate(order.id, e.target.value as ShopOrder['status'])}
-                                                        className="border border-gray-300 px-3 py-1 text-xs font-mono uppercase focus:outline-none focus:border-brand-blue"
-                                                    >
-                                                        <option value="pending">Pending</option>
-                                                        <option value="paid">Paid</option>
-                                                        <option value="shipped">Shipped</option>
-                                                        <option value="delivered">Delivered</option>
-                                                        <option value="cancelled">Cancelled</option>
-                                                    </select>
                                                 </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                    </div>
-                )}
+                    );
+                })()}
             </div>
         </div>
     );

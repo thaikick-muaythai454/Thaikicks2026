@@ -2,7 +2,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import Stripe from "https://esm.sh/stripe@14.16.0?target=deno";
-import { generateBookingEmailHTML } from "../shared/email-template.ts";
+import { generateBookingEmailHTML, generateShopEmailHTML } from "../shared/email-template.ts";
 
 const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
     apiVersion: "2023-10-16",
@@ -103,7 +103,7 @@ serve(async (req) => {
 
                 } else {
                     // Update SHOP ORDER status to paid
-                    await supabase
+                    const { data: updatedOrder, error: updateError } = await supabase
                         .from("shop_orders")
                         .update({
                             status: "paid",
@@ -112,9 +112,61 @@ serve(async (req) => {
                             stripe_payment_intent_id: session.payment_intent,
                             admin_notes: `Stripe Session ID: ${session.id}`
                         })
-                        .eq("id", orderId);
+                        .eq("id", orderId)
+                        .select()
+                        .single();
 
-                    console.log(`Shop Order ${orderId} successfully paid.`);
+                    if (!updateError && updatedOrder) {
+                        console.log(`Shop Order ${orderId} successfully paid.`);
+
+                        // SEND CONFIRMATION EMAIL
+                        const resendApiKey = Deno.env.get("RESEND_API_KEY");
+                        const customerEmail = session.customer_details?.email;
+
+                        // Need items and shipping from the updated order
+                        const contactDetails = updatedOrder.contact_details ? (typeof updatedOrder.contact_details === 'string' ? JSON.parse(updatedOrder.contact_details) : updatedOrder.contact_details) : {};
+                        const customerName = contactDetails.name || 'Fighter';
+                        const items = updatedOrder.items || [];
+                        const shippingAddress = updatedOrder.shipping_address || 'TBD / In-store Pickup';
+
+                        if (resendApiKey && customerEmail) {
+                            try {
+                                const emailHtml = generateShopEmailHTML({
+                                    orderId: updatedOrder.id,
+                                    customerName: customerName,
+                                    amount: updatedOrder.total_amount,
+                                    currency: 'THB',
+                                    items: items,
+                                    shippingAddress: shippingAddress
+                                });
+
+                                const emailResponse = await fetch('https://api.resend.com/emails', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Authorization': `Bearer ${resendApiKey}`,
+                                        'Content-Type': 'application/json'
+                                    },
+                                    body: JSON.stringify({
+                                        from: 'ThaiKicks <shop@thaikicks.com>',
+                                        to: [customerEmail],
+                                        subject: 'Order Confirmed - ThaiKicks',
+                                        html: emailHtml
+                                    })
+                                });
+                                if (!emailResponse.ok) {
+                                    console.error('Failed to send shop email:', await emailResponse.text());
+                                } else {
+                                    console.log('Shop confirmation email sent to', customerEmail);
+                                }
+                            } catch (e) {
+                                console.error('Error sending shop confirmation email:', e);
+                            }
+                        } else {
+                            console.log("RESEND_API_KEY or customer email not available. Skipping email sending.");
+                        }
+                    } else {
+                        console.error(`Failed to update Shop Order ${orderId}:`, updateError);
+                    }
                 }
             }
         }
