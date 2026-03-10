@@ -550,12 +550,13 @@ export const updateSystemSetting = async (key: string, value: string) => {
     // Check if the setting exists first
     const { data: existing, error: checkError } = await supabase
         .from('system_settings')
-        .select('id')
+        .select('key')
         .eq('key', key)
         .maybeSingle();
 
     if (checkError) {
-        console.warn(`Error checking setting ${key}:`, checkError);
+        console.error(`Error checking setting ${key}:`, checkError);
+        throw checkError;
     }
 
     if (existing) {

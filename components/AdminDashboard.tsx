@@ -423,9 +423,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ bookings }) => {
         setHeroImages(updatedImages);
         await updateSystemSetting('hero_images', JSON.stringify(updatedImages));
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert("Failed to upload hero image");
+      alert("Failed to upload hero image: " + (err.message || String(err)));
     } finally {
       setIsUploadingHero(false);
       // Reset the file input so the same file could be selected again if needed
@@ -440,9 +440,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ bookings }) => {
       updatedImages.splice(index, 1);
       setHeroImages(updatedImages);
       await updateSystemSetting('hero_images', JSON.stringify(updatedImages));
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert("Failed to remove hero image");
+      alert("Failed to remove hero image: " + (err.message || String(err)));
     }
   };
 
