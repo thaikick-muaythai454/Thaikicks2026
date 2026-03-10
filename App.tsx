@@ -72,7 +72,7 @@ const GymCard: React.FC<{ gym: Gym; onBook: () => void; isLarge?: boolean }> = (
     {/* Image Container */}
     <div className="relative w-full h-[400px] overflow-hidden bg-gray-200">
       <img
-        src={gym.images[0]}
+        src={gym.images?.[0] || gym.profilePhoto || 'https://via.placeholder.com/600x400?text=No+Image'}
         alt={gym.name}
         className="w-full h-full object-cover contrast-125 transition-all duration-500"
       />
@@ -128,8 +128,8 @@ const HomePage: React.FC<{ user: User | null; gyms: Gym[]; setBookings: any; cat
   };
 
   const filteredGyms = gyms.filter(gym => {
-    // Only show verified gyms in search results
-    if (gym.isVerified === false) return false;
+    // Only show verified or approved gyms in search results
+    if (!gym.isVerified && gym.approvalStatus !== 'approved') return false;
 
     const matchLocation = gym.location.toLowerCase().includes(locationInput.toLowerCase()) || gym.name.toLowerCase().includes(locationInput.toLowerCase());
     const matchDiscipline = disciplineInput === '' || gym.trainers.some(t => t.specialty.toLowerCase().includes(disciplineInput.toLowerCase()));
@@ -426,6 +426,12 @@ const ShopOrdersSection: React.FC<{ userId: string }> = ({ userId }) => {
 };
 
 const CustomerDashboard: React.FC<{ user: User; bookings: Booking[]; requestAffiliate: () => void }> = ({ user, bookings, requestAffiliate }) => {
+  const [isEditingProfile, setIsEditingProfile] = React.useState(false);
+  const [editName, setEditName] = React.useState(user.name);
+  const [editAvatar, setEditAvatar] = React.useState(user.avatar || '');
+  const [avatarFile, setAvatarFile] = React.useState<File | null>(null);
+  const [isSavingProfile, setIsSavingProfile] = React.useState(false);
+
   // Filter bookings for this user
   const myBookings = bookings.filter(b => b.userId === user.id);
 
@@ -453,10 +459,139 @@ const CustomerDashboard: React.FC<{ user: User; bookings: Booking[]; requestAffi
     );
   };
 
+  const handleSaveProfile = async () => {
+    setIsSavingProfile(true);
+    try {
+      const { updateUserProfile, uploadAvatar } = await import('./services/dataService');
+
+      let finalAvatarUrl = editAvatar;
+      if (avatarFile) {
+        const uploadedUrl = await uploadAvatar(user.id, avatarFile);
+        if (uploadedUrl) finalAvatarUrl = uploadedUrl;
+      }
+
+      await updateUserProfile(user.id, { name: editName, avatar_url: finalAvatarUrl });
+      setIsEditingProfile(false);
+      setAvatarFile(null);
+      alert('Profile updated successfully!');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to update profile');
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setAvatarFile(file);
+      // Create a local preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setEditAvatar(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   return (
     <DashboardContainer title={`Welcome Back, ${user.name.split(' ')[0]}`} subtitle={`Fighter Dashboard // ID: ${user.id}`}>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
         <div className="lg:col-span-2 space-y-12">
+
+          {/* Section: Profile Info */}
+          <BlockTable title="Personal Information">
+            <div className="p-6 bg-white">
+              {isEditingProfile ? (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-mono uppercase text-gray-500 mb-1">Full Name</label>
+                    <input
+                      type="text"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      className="w-full bg-gray-50 border border-gray-200 p-3 font-mono text-sm uppercase text-brand-charcoal"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-mono uppercase text-gray-500 mb-1">Profile Picture</label>
+                    <div className="flex items-center gap-4">
+                      <div className="w-16 h-16 bg-gray-200 overflow-hidden border border-gray-300 shrink-0">
+                        <img src={editAvatar || 'https://via.placeholder.com/150'} alt="Preview" className="w-full h-full object-cover" />
+                      </div>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileChange}
+                        className="w-full bg-gray-50 border border-gray-200 p-2 font-mono text-sm file:mr-4 file:py-2 file:px-4 file:border-0 file:text-xs file:font-bold file:bg-brand-charcoal file:text-white hover:file:bg-brand-blue file:cursor-pointer"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-4 pt-4">
+                    <button
+                      onClick={handleSaveProfile}
+                      disabled={isSavingProfile}
+                      className="bg-brand-charcoal text-white px-6 py-3 font-mono text-xs font-bold uppercase hover:bg-brand-blue disabled:opacity-50"
+                    >
+                      {isSavingProfile ? 'Saving...' : 'Save Changes'}
+                    </button>
+                    <button
+                      onClick={() => setIsEditingProfile(false)}
+                      className="border border-brand-charcoal text-brand-charcoal px-6 py-3 font-mono text-xs font-bold uppercase hover:bg-gray-100"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
+                  <div className="flex items-start gap-6 flex-1 min-w-0">
+                    <div className="w-16 h-16 bg-gray-200 overflow-hidden border border-gray-300 shrink-0 mt-1">
+                      <img src={user.avatar || 'https://via.placeholder.com/150'} alt="Avatar" className="w-full h-full object-cover" />
+                    </div>
+                    <div className="space-y-4 flex-1">
+                      <div>
+                        <div className="text-xl font-black uppercase text-brand-charcoal truncate">{user.name}</div>
+                        <div className="flex gap-2 items-center mt-1 flex-wrap">
+                          <span className="font-mono text-[10px] bg-brand-charcoal text-white px-2 py-0.5 uppercase tracking-wider font-bold shadow-sm">{user.role}</span>
+                          <span className="font-mono text-[10px] text-gray-500 bg-gray-100 px-2 py-0.5 border border-gray-200" title={user.id}>ID: <span className="font-bold">{user.id.substring(0, 8)}...</span></span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-gray-100">
+                        <div>
+                          <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">Email Address</label>
+                          <div className="font-mono text-xs text-brand-charcoal truncate">{user.email}</div>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-mono text-gray-400 uppercase mb-1">Password</label>
+                          <div className="font-mono text-xs text-brand-charcoal flex items-center justify-between">
+                            ••••••••••••
+                            <button onClick={() => window.location.hash = '/reset-password'} className="text-[10px] text-brand-blue hover:text-brand-red uppercase underline font-bold">Manage</button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setIsEditingProfile(true)}
+                    className="hidden md:block border border-brand-charcoal text-brand-charcoal hover:bg-brand-charcoal hover:text-white transition-colors uppercase font-mono text-xs font-bold px-4 py-2 shrink-0"
+                  >
+                    Edit Profile
+                  </button>
+                </div>
+              )}
+              {!isEditingProfile && (
+                <button
+                  onClick={() => setIsEditingProfile(true)}
+                  className="mt-6 sm:hidden w-full border border-brand-charcoal py-3 text-brand-charcoal hover:bg-gray-100 uppercase font-mono text-xs font-bold"
+                >
+                  Edit Profile
+                </button>
+              )}
+            </div>
+          </BlockTable>
 
           {/* Section 1: Active Bookings */}
           <BlockTable title="Active & Upcoming Sessions">
@@ -530,31 +665,47 @@ const CustomerDashboard: React.FC<{ user: User; bookings: Booking[]; requestAffi
               <div className="font-mono text-xs text-brand-red mt-2 uppercase font-bold tracking-widest">{user.affiliateStatus} STATUS</div>
             </div>
 
-            {user.affiliateStatus === 'none' && (
-              <button onClick={requestAffiliate} className="w-full bg-white text-brand-charcoal font-black uppercase py-4 hover:bg-brand-blue hover:text-white transition-colors relative z-10">
-                Join Program
+            {(user.affiliateStatus === 'none' || user.affiliateStatus === 'rejected') && (
+              <button
+                onClick={requestAffiliate}
+                className="w-full bg-white text-brand-charcoal font-black uppercase py-4 hover:bg-brand-blue hover:text-white transition-colors relative z-10"
+              >
+                {user.affiliateStatus === 'rejected' ? 'Request Again' : 'Join Program'}
               </button>
             )}
 
             {user.affiliateStatus === 'active' && (
               <div className="relative z-10 mt-4">
-                <label className="block text-xs font-mono text-brand-bone mb-2 uppercase opacity-70">Your Referral Link</label>
-                <div className="flex">
-                  <input
-                    readOnly
-                    value={`https://thaikicks.com/?ref=${user.affiliateCode}`}
-                    className="w-full bg-black/30 border border-white/20 p-3 font-mono text-xs text-white outline-none"
-                  />
+                <label className="block text-xs font-mono text-brand-bone mb-2 uppercase opacity-70">Your Affiliate Code</label>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 bg-black/30 border border-white/20 p-3 font-mono text-lg font-black text-white tracking-widest uppercase">
+                    {user.affiliateCode}
+                  </div>
                   <button
                     onClick={() => {
-                      navigator.clipboard.writeText(`https://thaikicks.com/?ref=${user.affiliateCode}`);
-                      alert('Referral link copied to clipboard!');
+                      const code = user.affiliateCode || '';
+                      if (navigator.clipboard && window.isSecureContext) {
+                        navigator.clipboard.writeText(code).then(() => alert('Code copied!'));
+                      } else {
+                        // Fallback for non-HTTPS (local network)
+                        const el = document.createElement('textarea');
+                        el.value = code;
+                        el.style.position = 'fixed';
+                        el.style.opacity = '0';
+                        document.body.appendChild(el);
+                        el.focus();
+                        el.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(el);
+                        alert('Code copied!');
+                      }
                     }}
-                    className="bg-brand-red text-white font-bold uppercase text-xs px-4 hover:bg-white hover:text-brand-red border border-brand-red transition-colors"
+                    className="bg-brand-red text-white font-bold uppercase text-xs px-4 py-3 hover:bg-white hover:text-brand-red border border-brand-red transition-colors"
                   >
                     Copy
                   </button>
                 </div>
+                <p className="text-[10px] font-mono text-brand-bone opacity-50 mt-2">Enter this code at checkout to earn commission</p>
               </div>
             )}
 
@@ -580,7 +731,7 @@ const App: React.FC = () => {
   /* App Data */
   const [gyms, setGyms] = useState<Gym[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]); // Start empty, fetch real data
-  const [applications, setApplications] = useState<any[]>(AFFILIATE_APPLICATIONS);
+  const [applications, setApplications] = useState<any[]>([]);
 
   const [notification, setNotification] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
 
@@ -830,7 +981,7 @@ const App: React.FC = () => {
             <Route path="/camps" element={<HomePage user={activeUser} gyms={gyms} setBookings={setBookings} categoryFilter="camp" />} />
             <Route path="/booking/:gymId" element={<BookingPage gyms={gyms} user={activeUser} setBookings={setBookings} />} />
             <Route path="/dashboard" element={activeUser?.role === 'customer' ? <CustomerDashboard user={activeUser} bookings={bookings} requestAffiliate={handleAffiliateRequest} /> : <HomePage user={activeUser} gyms={gyms} setBookings={setBookings} />} />
-            <Route path="/owner" element={activeUser?.role === 'owner' ? <AdminDashboard bookings={bookings} applications={applications} handleApprove={handleAffiliateApproval} /> : <HomePage user={activeUser} gyms={gyms} setBookings={setBookings} />} />
+            <Route path="/owner" element={activeUser?.role === 'owner' ? <OwnerDashboard user={activeUser} gyms={gyms} updateGym={handleUpdateGym} bookings={bookings} /> : <HomePage user={activeUser} gyms={gyms} setBookings={setBookings} />} />
             <Route path="/admin" element={activeUser?.role === 'admin' ? <AdminDashboard bookings={bookings} applications={applications} handleApprove={handleAffiliateApproval} /> : <HomePage user={activeUser} gyms={gyms} setBookings={setBookings} />} />
             <Route path="/analytics" element={(activeUser?.role === 'admin' || activeUser?.role === 'owner') ? <AnalyticsDashboard bookings={bookings} /> : <HomePage user={activeUser} gyms={gyms} setBookings={setBookings} />} />
             <Route path="/shop" element={<ShopPage user={activeUser} />} />

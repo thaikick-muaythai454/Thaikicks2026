@@ -100,8 +100,30 @@ const ProductManagement: React.FC = () => {
                         </div>
 
                         <div>
-                            <label className="block text-[10px] uppercase font-bold mb-1">Image URL</label>
-                            <input className="w-full border p-2 font-mono text-xs" value={editingProduct?.imageUrl || ''} onChange={e => setEditingProduct({ ...editingProduct, imageUrl: e.target.value })} placeholder="https://..." />
+                            <label className="block text-[10px] uppercase font-bold mb-1">Product Image</label>
+                            <div className="flex gap-2 items-center">
+                                {editingProduct?.imageUrl && <img src={editingProduct.imageUrl} className="w-10 h-10 object-cover border border-gray-200" alt="Preview" />}
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="w-full border p-2 font-mono text-xs file:mr-2 file:border-0 file:bg-brand-charcoal file:text-white file:text-[10px] file:px-2 file:cursor-pointer"
+                                    onChange={async (e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                            try {
+                                                e.target.disabled = true;
+                                                const { uploadImage } = await import('../services/dataService');
+                                                const url = await uploadImage('products', file);
+                                                if (url) setEditingProduct({ ...editingProduct, imageUrl: url });
+                                            } catch (err) {
+                                                alert("Failed to upload image");
+                                            } finally {
+                                                e.target.disabled = false;
+                                            }
+                                        }
+                                    }}
+                                />
+                            </div>
                         </div>
 
                         <div className="flex items-center gap-2">
@@ -131,9 +153,9 @@ const ProductManagement: React.FC = () => {
                                 <div className="font-mono text-xs text-gray-500">{product.category} • ฿{product.price.toLocaleString()}</div>
                                 <div className="flex gap-2 mt-1">
                                     <span className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded ${product.stockStatus === 'in_stock' ? 'bg-green-100 text-green-700' :
-                                            product.stockStatus === 'low_stock' ? 'bg-yellow-100 text-yellow-700' :
-                                                product.stockStatus === 'out_of_stock' ? 'bg-red-100 text-red-700' :
-                                                    'bg-blue-100 text-blue-700'
+                                        product.stockStatus === 'low_stock' ? 'bg-yellow-100 text-yellow-700' :
+                                            product.stockStatus === 'out_of_stock' ? 'bg-red-100 text-red-700' :
+                                                'bg-blue-100 text-blue-700'
                                         }`}>
                                         {product.stockStatus.replace('_', ' ')}
                                     </span>

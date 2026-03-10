@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Shield, Check, X, Users, DollarSign, Activity, Trash2, Edit, Plus, Calendar } from 'lucide-react';
 import { Booking, Gym, Trainer, TrainerSchedule, User } from '../lib/types';
-import { createGym, updateGym, createTrainer, deleteTrainer, getTrainerSchedules, createTrainerSchedule, deleteTrainerSchedule } from '../services/dataService';
+import { createGym, updateGym as updateGymDB, createTrainer, deleteTrainer, getTrainerSchedules, createTrainerSchedule, deleteTrainerSchedule } from '../services/dataService';
 
 interface OwnerDashboardProps {
     user: User;
@@ -64,50 +64,17 @@ const OwnerDashboard: React.FC<OwnerDashboardProps> = ({ user, gyms, updateGym, 
 
         try {
             if (editingGym.id) {
-                // Optimistic update for UI if needed, but we rely on dataService and re-renders
-                await updateGym(editingGym as Gym); // Helper in App.tsx just updates local state mostly.
-                // We should call API mostly. updateGym in App.tsx doesn't persist? 
-                // Wait, updateGym in App.tsx is just local setGyms.
-                // In AdminDashboard we call `updateGym` from dataService directly.
-                // But App.tsx passes `updateGym`. Let's use the one from dataService for persistence.
+                // Update in the database and reset approval status
+                const payload = { ...editingGym, approvalStatus: 'pending' as const };
+                await updateGymDB(editingGym.id, payload);
 
-                // Wait, we need to import updateGym from dataService to persist.
-                // Renaming prop to avoid conflict or just use module import.
-            }
-            // Actually we have `updateGym` from Props and `updateGym` from import. 
-            // The prop one updates App.tsx state. The import one persists to DB.
-            // Let's use the DB one primarily.
-
-            // Persist to DB
-            if (editingGym.id) {
-                // We imported updateGym from dataService as `updateGym`? No, we need to clarify.
-                // The file has imports from '../services/dataService'. 
-                // We should use the DB function.
-                // Wait, I didn't alias it. The module scope function `updateGym` shadows? Or vice versa?
-                // The Props has `updateGym`.
-                // Let's use the module one. I will use `updateGymDB` alias or just rely on module if I didn't destructure.
-                // I destructured props. So `updateGym` is the Prop.
-                // I will use `updateGym` (API) by not destructuring or renaming.
-                // Let's assume standard behavior: I need to call the API.
-            }
-
-            // Let's fix this in logic below by using the imported function explicitly if possible, 
-            // or renaming the prop.
-            // I will rename the prop in the destructured args to `updateGymLocal`.
-
-            if (editingGym.id) {
-                // This call needs to go to DB.
-                // I'll fix this in the implementation by importing as aliases.
+                // Update local state for immediate UI reflection
+                updateGym(payload as Gym);
+                setMyGym({ ...myGym, ...payload } as Gym);
             }
 
             setIsGymFormOpen(false);
             setEditingGym(null);
-            // We might need to trigger a refresh of gyms in App.tsx?
-            // App.tsx fetches gyms on mount.
-            // If we update, we might need to reload window or refetch. 
-            // AdminDashboard calls `loadGyms`. Here we rely on props.
-            // Ideally App.tsx should expose a `refreshGyms` function.
-            // For now, let's just update local stat via prop to reflect immediately.
         } catch (err) {
             console.error(err);
             alert("Failed to save gym. Please check your connection and try again.");
@@ -127,24 +94,55 @@ const OwnerDashboard: React.FC<OwnerDashboardProps> = ({ user, gyms, updateGym, 
     // ... (Implementing below)
 
     if (!myGym) {
-        if (gyms.length > 0 && !gyms.find(g => g.ownerId === user.id)) {
+        if (gyms.length >= 0 && !myGym) {
             return (
-                <div className="min-h-screen flex flex-col items-center justify-center p-12 text-center border-2 border-brand-charcoal m-10 border-dashed bg-brand-bone">
-                    <h2 className="font-black text-2xl uppercase mb-4 text-brand-charcoal">No Gym Assigned</h2>
-                    <p className="font-mono text-sm max-w-md mb-6 text-gray-600">
-                        We could not find a gym linked to your owner account ID: <br /><span className="font-bold text-xs bg-gray-200 px-2 py-1">{user.id}</span>
-                    </p>
-                    <div className="p-4 bg-white border border-gray-200 font-mono text-xs text-left mb-6 shadow-sm">
-                        <strong className="block mb-2 text-brand-blue uppercase">System Report:</strong>
-                        <ul className="list-disc pl-4 space-y-1 text-gray-500">
-                            <li>Role: {user.role}</li>
-                            <li>Visible Gyms: {gyms.length}</li>
-                            <li>Status: Unlinked</li>
-                        </ul>
-                    </div>
-                    <button onClick={() => window.location.reload()} className="bg-brand-charcoal text-white font-bold uppercase px-6 py-3 hover:bg-brand-blue transition-colors">
-                        Refresh System
-                    </button>
+                <div className="min-h-screen flex flex-col items-center justify-center p-12 text-center border-2 border-brand-charcoal m-10 border-dashed bg-brand-bone animate-reveal">
+                    {isGymFormOpen ? (
+                        <div className="bg-white border-2 border-brand-charcoal p-6 max-w-xl w-full text-left shadow-[8px_8px_0px_0px_#1A1A1A]">
+                            <h2 className="font-black text-2xl uppercase mb-4 border-b-2 border-brand-charcoal pb-2">Register Facility</h2>
+                            <form className="space-y-4" onSubmit={async (e) => {
+                                e.preventDefault();
+                                if (editingGym && editingGym.name) {
+                                    try {
+                                        await createGym({
+                                            ...editingGym,
+                                            ownerId: user.id
+                                        } as Gym);
+                                        window.location.reload();
+                                    } catch (err) {
+                                        alert("Failed to create facility.");
+                                    }
+                                }
+                            }}>
+                                <input className="border p-2 text-xs font-mono w-full" value={editingGym?.name || ''} onChange={e => setEditingGym({ ...editingGym, name: e.target.value })} placeholder="Gym / Camp Name" required />
+                                <select
+                                    className="border p-2 text-xs font-mono w-full"
+                                    value={editingGym?.category || 'gym'}
+                                    onChange={e => setEditingGym({ ...editingGym, category: e.target.value as 'gym' | 'camp' })}
+                                    required
+                                >
+                                    <option value="gym">Gym</option>
+                                    <option value="camp">Camp</option>
+                                </select>
+                                <input className="border p-2 text-xs font-mono w-full" value={editingGym?.location || ''} onChange={e => setEditingGym({ ...editingGym, location: e.target.value })} placeholder="Location (City, Province)" required />
+                                <textarea className="border p-2 text-xs font-mono w-full h-24" value={editingGym?.description || ''} onChange={e => setEditingGym({ ...editingGym, description: e.target.value })} placeholder="Short description..." required />
+                                <div className="flex gap-2 pt-4">
+                                    <button type="button" onClick={() => { setIsGymFormOpen(false); setEditingGym(null); }} className="flex-1 bg-gray-200 border-2 border-brand-charcoal py-2 font-black uppercase text-xs hover:bg-gray-300">Cancel</button>
+                                    <button type="submit" className="flex-1 bg-brand-charcoal text-white border-2 border-brand-charcoal py-2 font-black uppercase text-xs hover:bg-brand-blue">Submit for Approval</button>
+                                </div>
+                            </form>
+                        </div>
+                    ) : (
+                        <>
+                            <h2 className="font-black text-2xl uppercase mb-4 text-brand-charcoal">No Facility Found</h2>
+                            <p className="font-mono text-sm max-w-md mb-6 text-gray-600">
+                                Your owner account is not linked to any Gym or Camp yet. You need to create one and wait for Admin approval.
+                            </p>
+                            <button onClick={() => { setEditingGym({ category: 'gym' }); setIsGymFormOpen(true); }} className="bg-brand-charcoal text-white font-bold uppercase px-6 py-3 hover:bg-brand-blue flex items-center gap-2 shadow-[4px_4px_0px_0px_#AE3A17] hover:translate-y-[2px] hover:translate-x-[2px] hover:shadow-[2px_2px_0px_0px_#AE3A17] transition-all">
+                                <Plus className="w-5 h-5" /> Register Gym / Camp
+                            </button>
+                        </>
+                    )}
                 </div>
             );
         }
@@ -164,13 +162,17 @@ const OwnerDashboard: React.FC<OwnerDashboardProps> = ({ user, gyms, updateGym, 
                         <Shield className="w-4 h-4" />
                         Owner Access
                     </div>
-                    {myGym.isVerified ? (
-                        <div className="flex items-center gap-1 font-mono text-[10px] uppercase font-bold text-green-600 bg-green-50 px-2 py-1 border border-green-200">
-                            <Check className="w-3 h-3" /> System Verified
+                    {myGym.approvalStatus === 'approved' ? (
+                        <div className="flex items-center gap-1 font-mono text-[10px] uppercase font-bold text-green-600 bg-green-50 px-2 py-1 border border-green-200 shadow-sm">
+                            <Check className="w-3 h-3" /> Approved & Verified
+                        </div>
+                    ) : myGym.approvalStatus === 'rejected' ? (
+                        <div className="flex items-center gap-1 font-mono text-[10px] uppercase font-bold text-red-600 bg-red-50 px-2 py-1 border border-red-200 shadow-sm">
+                            <X className="w-3 h-3" /> Rejected
                         </div>
                     ) : (
-                        <div className="flex items-center gap-1 font-mono text-[10px] uppercase font-bold text-orange-600 bg-orange-50 px-2 py-1 border border-orange-200">
-                            <Activity className="w-3 h-3 animate-pulse" /> Pending Verification
+                        <div className="flex items-center gap-1 font-mono text-[10px] uppercase font-bold text-orange-600 bg-orange-50 px-2 py-1 border border-orange-200 shadow-sm">
+                            <Activity className="w-3 h-3 animate-pulse" /> Pending Approval (Under Review)
                         </div>
                     )}
                 </div>
@@ -209,12 +211,16 @@ const OwnerDashboard: React.FC<OwnerDashboardProps> = ({ user, gyms, updateGym, 
                     <BlockTable title="Facility Management" icon={<Edit className="w-4 h-4" />}>
                         <div className="p-4 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
                             <span className="font-mono text-xs text-gray-500">Manage your facility details</span>
-                            <button
-                                onClick={() => { setEditingGym(myGym); setIsGymFormOpen(true); }}
-                                className="bg-brand-charcoal text-white px-3 py-1 font-mono text-xs font-bold uppercase flex items-center gap-2 hover:bg-brand-blue"
-                            >
-                                <Edit className="w-3 h-3" /> Edit Profile
-                            </button>
+                            {myGym.approvalStatus === 'pending' ? (
+                                <span className="text-[10px] font-mono font-bold text-orange-600 uppercase">Locked: Waiting Admin Approval</span>
+                            ) : (
+                                <button
+                                    onClick={() => { setEditingGym(myGym); setIsGymFormOpen(true); }}
+                                    className="bg-brand-charcoal text-white px-3 py-1 font-mono text-xs font-bold uppercase flex items-center gap-2 hover:bg-brand-blue"
+                                >
+                                    <Edit className="w-3 h-3" /> Edit Profile
+                                </button>
+                            )}
                         </div>
 
                         {isGymFormOpen && (
@@ -266,17 +272,10 @@ const OwnerDashboard: React.FC<OwnerDashboardProps> = ({ user, gyms, updateGym, 
                                     <form className="space-y-4" onSubmit={async (e) => {
                                         e.preventDefault();
                                         if (editingGym && editingGym.id) {
-                                            // Use updateGym from Props (local) AND call API
-                                            // We need to import the API function directly to avoid naming collision if we want to be safe, 
-                                            // but actually we can just use the prop updateGym for local state 
-                                            // and assume we need to reload page or something better.
-                                            // For now, let's just alert.
-
-                                            // Actually let's assume updateGym (API) is what we want.
-                                            // We'll fix imports later.
-                                            await updateGym(editingGym as Gym);
+                                            // Make sure to reset approval status to pending if editing
+                                            await updateGymDB(editingGym.id, { ...editingGym, approvalStatus: 'pending', isVerified: false });
                                             setIsGymFormOpen(false);
-                                            window.location.reload(); // Quick fix to reload data
+                                            window.location.reload();
                                         }
                                     }}>
                                         <div className="grid grid-cols-2 gap-4">
@@ -295,7 +294,29 @@ const OwnerDashboard: React.FC<OwnerDashboardProps> = ({ user, gyms, updateGym, 
                                         </div>
                                         <div className="grid grid-cols-1 gap-4">
                                             <input className="border p-2 text-xs w-full" value={editingGym?.location} onChange={e => setEditingGym({ ...editingGym, location: e.target.value })} placeholder="Location" />
-                                            <input className="border p-2 text-xs w-full" value={editingGym?.profilePhoto || ''} onChange={e => setEditingGym({ ...editingGym, profilePhoto: e.target.value })} placeholder="Profile Photo URL (Overrides first image as avatar)" />
+                                            <div className="flex gap-2 items-center w-full">
+                                                {editingGym?.profilePhoto && <img src={editingGym.profilePhoto} className="w-8 h-8 object-cover border" alt="Preview" />}
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    className="border p-1 font-mono text-xs w-full file:mr-2 file:border-0 file:bg-brand-charcoal file:text-white file:text-[10px] file:px-2 file:cursor-pointer"
+                                                    onChange={async (e) => {
+                                                        const file = e.target.files?.[0];
+                                                        if (file) {
+                                                            try {
+                                                                e.target.disabled = true;
+                                                                const { uploadImage } = await import('../services/dataService');
+                                                                const url = await uploadImage('gyms', file);
+                                                                if (url) setEditingGym({ ...editingGym, profilePhoto: url });
+                                                            } catch (err) {
+                                                                alert("Failed to upload image");
+                                                            } finally {
+                                                                e.target.disabled = false;
+                                                            }
+                                                        }
+                                                    }}
+                                                />
+                                            </div>
                                             <input className="border p-2 text-xs w-full" value={editingGym?.socialMedia || ''} onChange={e => setEditingGym({ ...editingGym, socialMedia: e.target.value })} placeholder="Social Media Link (Instagram/Facebook)" />
                                             <textarea className="border p-2 text-xs w-full h-20" value={editingGym?.bio || ''} onChange={e => setEditingGym({ ...editingGym, bio: e.target.value })} placeholder="Detailed Gym Bio / History..." />
                                         </div>

@@ -4,7 +4,7 @@ import { ShoppingBag, ArrowLeft, CreditCard } from 'lucide-react';
 import { CartItem } from '../lib/types';
 import { createShopOrder } from '../services/shopService';
 import { User } from '../lib/types';
-import { supabase } from '../lib/supabaseClient';
+// import { supabase } from '../lib/supabaseClient'; // Re-enable with Stripe
 
 interface CheckoutPageProps {
     user: User | null;
@@ -22,6 +22,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ user }) => {
         email: user?.email || '',
         phone: '',
         address: '',
+        affiliateCode: '',
         paymentMethod: 'promptpay'
     });
 
@@ -52,7 +53,8 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ user }) => {
                 contactDetails: JSON.stringify({
                     name: formData.name,
                     email: formData.email,
-                    phone: formData.phone
+                    phone: formData.phone,
+                    affiliateCode: formData.affiliateCode || null
                 }),
                 paymentMethod: formData.paymentMethod,
                 items: cart.map(item => ({
@@ -84,7 +86,16 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ user }) => {
             };
             localStorage.setItem('thaikick_last_order', JSON.stringify(receiptData));
 
-            // Call Stripe Checkout Edge Function
+            // ── DEV MODE: Bypass Stripe ──────────────────────────────────────
+            // [TESTING] Skip payment gateway — mark order as paid directly
+            // To re-enable Stripe, remove this block and uncomment the block below
+            localStorage.removeItem('thaikick_cart');
+            setCart([]);
+            navigate('/checkout-success');
+            return;
+            // ── END DEV MODE ─────────────────────────────────────────────────
+
+            /* ── PRODUCTION: Stripe Checkout ────────────────────────────────
             const { data: { sessionUrl }, error: stripeError } = await supabase.functions.invoke('stripe-checkout', {
                 body: {
                     orderId: createdOrder.id,
@@ -105,9 +116,10 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ user }) => {
             } else {
                 navigate('/checkout-success');
             }
+            ── END PRODUCTION ──────────────────────────────────────────────── */
         } catch (error) {
             console.error('Order failed:', error);
-            alert('Failed to create order or initialize payment. Please try again.');
+            alert('Failed to create order. Please try again.');
         } finally {
             setIsProcessing(false);
         }
@@ -220,6 +232,18 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ user }) => {
                                     className="w-full border-2 border-gray-300 p-3 font-mono text-sm focus:border-brand-blue outline-none h-24"
                                     placeholder="123 Street Name, City, Province, Postal Code"
                                 />
+                            </div>
+
+                            <div className="border border-dashed border-brand-blue p-4 bg-blue-50/50">
+                                <label className="block font-mono text-xs uppercase font-bold mb-2 text-brand-blue">Affiliate Code <span className="text-gray-400 normal-case font-normal">(Optional)</span></label>
+                                <input
+                                    type="text"
+                                    value={formData.affiliateCode}
+                                    onChange={e => setFormData({ ...formData, affiliateCode: e.target.value.toUpperCase() })}
+                                    className="w-full border-2 border-brand-blue/30 p-3 font-mono text-sm focus:border-brand-blue outline-none uppercase tracking-widest bg-white"
+                                    placeholder="e.g. FIGHTER1234"
+                                />
+                                <p className="text-[10px] font-mono text-gray-400 mt-1">Got a code from an affiliate? Enter it here.</p>
                             </div>
 
                             <div className="border-t-2 border-brand-charcoal pt-6">

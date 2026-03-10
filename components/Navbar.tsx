@@ -80,9 +80,14 @@ const Navbar: React.FC<NavbarProps> = ({ activeUser, onLogout }) => {
                     <span className="font-bold text-xs uppercase text-brand-charcoal">{activeUser.name}</span>
                     <span className="font-mono text-[10px] text-gray-500 uppercase">{activeUser.role}</span>
                   </div>
+                  {activeUser.avatar ? (
+                    <img src={activeUser.avatar} alt="Profile" className="w-8 h-8 rounded-full object-cover border-2 border-brand-charcoal" />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full border-2 border-brand-charcoal bg-gray-100 flex items-center justify-center text-xs font-bold text-brand-charcoal uppercase">{activeUser.name.charAt(0)}</div>
+                  )}
                   <button
                     onClick={handleLogout}
-                    className="p-2 border border-gray-200 hover:bg-brand-red hover:text-white hover:border-brand-red transition-colors rounded-full"
+                    className="p-2 border border-gray-200 hover:bg-brand-red hover:text-white hover:border-brand-red transition-colors rounded-full ml-2"
                     title="Sign Out"
                   >
                     <LogOut className="w-4 h-4" />
@@ -148,9 +153,16 @@ const Navbar: React.FC<NavbarProps> = ({ activeUser, onLogout }) => {
             <div className="border-t border-gray-100 pt-4 mt-2">
               {activeUser ? (
                 <div className="flex items-center justify-between">
-                  <div className="flex flex-col">
-                    <span className="font-bold text-sm uppercase text-brand-charcoal">{activeUser.name}</span>
-                    <span className="font-mono text-xs text-gray-500 uppercase">{activeUser.role}</span>
+                  <div className="flex items-center gap-3">
+                    {activeUser.avatar ? (
+                      <img src={activeUser.avatar} alt="Profile" className="w-10 h-10 rounded-full object-cover border-2 border-brand-charcoal" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full border-2 border-brand-charcoal bg-gray-100 flex items-center justify-center text-sm font-bold text-brand-charcoal uppercase">{activeUser.name.charAt(0)}</div>
+                    )}
+                    <div className="flex flex-col">
+                      <span className="font-bold text-sm uppercase text-brand-charcoal">{activeUser.name}</span>
+                      <span className="font-mono text-xs text-gray-500 uppercase">{activeUser.role}</span>
+                    </div>
                   </div>
                   <button
                     onClick={handleLogout}

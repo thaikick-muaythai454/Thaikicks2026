@@ -176,8 +176,30 @@ const EventManagement: React.FC = () => {
                             </div>
                         </div>
                         <div>
-                            <label className="block text-[10px] uppercase font-bold mb-1">Cover Image URL</label>
-                            <input className="w-full border p-2 font-mono text-xs" value={editingEvent?.cover_image || ''} onChange={e => setEditingEvent({ ...editingEvent, cover_image: e.target.value })} placeholder="https://..." />
+                            <label className="block text-[10px] uppercase font-bold mb-1">Cover Image</label>
+                            <div className="flex gap-2 items-center">
+                                {editingEvent?.cover_image && <img src={editingEvent.cover_image} className="w-10 h-10 object-cover border border-gray-200" alt="Preview" />}
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="w-full border p-2 font-mono text-xs file:mr-2 file:border-0 file:bg-brand-charcoal file:text-white file:text-[10px] file:px-2 file:cursor-pointer"
+                                    onChange={async (e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                            try {
+                                                e.target.disabled = true;
+                                                const { uploadImage } = await import('../services/dataService');
+                                                const url = await uploadImage('events', file);
+                                                if (url) setEditingEvent({ ...editingEvent, cover_image: url });
+                                            } catch (err) {
+                                                alert("Failed to upload image");
+                                            } finally {
+                                                e.target.disabled = false;
+                                            }
+                                        }
+                                    }}
+                                />
+                            </div>
                         </div>
                         <div>
                             <label className="block text-[10px] uppercase font-bold mb-1">Description</label>

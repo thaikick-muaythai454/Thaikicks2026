@@ -3,15 +3,15 @@ import React, { useState, useEffect } from 'react';
 import { Shield, Check, X, Users, DollarSign, Activity, Megaphone, Trash2, Edit, Plus, UserPlus, Calendar, Clock, BookOpen, Layers, ShoppingBag, Package } from 'lucide-react';
 import { USERS } from '../lib/auth-data';
 import { Booking, AffiliateApplication, Announcement, Gym, Trainer, TrainerSchedule, User, Course, Product } from '../lib/types';
-import { createAnnouncement, deleteAnnouncement, getAnnouncements, createGym, updateGym, deleteGym, getGyms, createTrainer, deleteTrainer, getTrainerSchedules, createTrainerSchedule, deleteTrainerSchedule, getAllUsers, getCourses, createCourse, updateCourse, deleteCourse, getSystemSetting, updateSystemSetting, updateUserRole } from '../services/dataService';
+import { createAnnouncement, deleteAnnouncement, getAnnouncements, createGym, updateGym, deleteGym, getGyms, createTrainer, deleteTrainer, getTrainerSchedules, createTrainerSchedule, deleteTrainerSchedule, getAllUsers, getCourses, createCourse, updateCourse, deleteCourse, getSystemSetting, updateSystemSetting, updateUserRole, getAffiliateApplications, updateAffiliateApplicationStatus, updateUserAffiliateStatus, updateGymApprovalStatus } from '../services/dataService';
 import { getProducts, createProduct, updateProduct, deleteProduct } from '../services/shopService';
 import ProductManagement from './ProductManagement';
 import EventManagement from './EventManagement';
 
 interface AdminDashboardProps {
   bookings: Booking[];
-  applications: AffiliateApplication[];
-  handleApprove: (id: string, ok: boolean) => void;
+  applications?: AffiliateApplication[];
+  handleApprove?: (id: string, ok: boolean) => void;
 }
 
 // Internal Sub-components
@@ -50,9 +50,10 @@ const DashboardContainer: React.FC<{ title: string; subtitle: string; children: 
   </div>
 );
 
-const AdminDashboard: React.FC<AdminDashboardProps> = ({ bookings, applications, handleApprove }) => {
+const AdminDashboard: React.FC<AdminDashboardProps> = ({ bookings }) => {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [users, setUsers] = useState<User[]>([]); // New state for users
+  const [users, setUsers] = useState<User[]>([]);
+  const [applications, setApplications] = useState<AffiliateApplication[]>([]);
   const [newsTitle, setNewsTitle] = useState("");
   const [newsContent, setNewsContent] = useState("");
   const [isPosting, setIsPosting] = useState(false);
@@ -102,7 +103,31 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ bookings, applications,
     loadUsers();
     loadCourses();
     loadProducts();
+    loadApplications();
   }, []);
+
+  const loadApplications = async () => {
+    const data = await getAffiliateApplications();
+    setApplications(data);
+  };
+
+  const handleApprove = async (appId: string, ok: boolean) => {
+    const status = ok ? 'approved' : 'rejected';
+    try {
+      const app = applications.find(a => a.id === appId);
+      await updateAffiliateApplicationStatus(appId, status);
+      if (ok && app) {
+        const code = `fighter${Math.floor(Math.random() * 10000)}`;
+        await updateUserAffiliateStatus(app.userId, true, 'active', code);
+      } else if (!ok && app) {
+        await updateUserAffiliateStatus(app.userId, false, 'rejected');
+      }
+      // Refresh list
+      await loadApplications();
+    } catch (err) {
+      console.error('Failed to update affiliate status', err);
+    }
+  };
 
   const loadCourses = async () => {
     const data = await getCourses();
@@ -371,8 +396,71 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ bookings, applications,
   };
 
 
-  const totalRevenue = bookings.reduce((sum, b) => sum + b.totalPrice, 0);
-  const totalCommission = bookings.reduce((sum, b) => sum + b.commissionAmount, 0);
+  // ── Analytics State ──────────────────────────────────────────
+  const [filterDateFrom, setFilterDateFrom] = React.useState('');
+  const [filterDateTo, setFilterDateTo] = React.useState('');
+  const [filterGymId, setFilterGymId] = React.useState('all');
+  const [filterStatus, setFilterStatus] = React.useState('all');
+
+  // Filtered bookings for analytics
+  const filteredBookings = bookings.filter(b => {
+    const matchFrom = !filterDateFrom || b.date >= filterDateFrom;
+    const matchTo = !filterDateTo || b.date <= filterDateTo;
+    const matchGym = filterGymId === 'all' || b.gymId === filterGymId;
+    const matchStatus = filterStatus === 'all' || b.status === filterStatus;
+    return matchFrom && matchTo && matchGym && matchStatus;
+  });
+
+  const totalRevenue = filteredBookings.reduce((sum, b) => sum + b.totalPrice, 0);
+  const totalCommission = filteredBookings.reduce((sum, b) => sum + (b.commissionAmount || 0), 0);
+  const totalNet = totalRevenue - totalCommission;
+
+  type GymPerf = { name: string; bookings: number; revenue: number; commission: number };
+  // Gym performance map
+  const gymPerformance = filteredBookings.reduce((acc: Record<string, GymPerf>, b) => {
+    if (!acc[b.gymId]) acc[b.gymId] = { name: b.gymName, bookings: 0, revenue: 0, commission: 0 };
+    acc[b.gymId].bookings += 1;
+    acc[b.gymId].revenue += b.totalPrice;
+    acc[b.gymId].commission += b.commissionAmount || 0;
+    return acc;
+  }, {} as Record<string, GymPerf>);
+  const gymPerfList: GymPerf[] = (Object.values(gymPerformance) as GymPerf[]).sort((a, b) => b.revenue - a.revenue);
+
+  // CSV Export
+  const handleExportCSV = () => {
+    const rows: string[] = [];
+    rows.push(['Booking ID', 'Date', 'Type', 'Status', 'Gym Name', 'User Name', 'Trainer', 'Total (฿)', 'Commission (฿)', 'Net (฿)'].join(','));
+    filteredBookings.forEach(b => {
+      rows.push([
+        b.id,
+        b.date,
+        b.type,
+        b.status,
+        `"${b.gymName}"`,
+        `"${b.userName}"`,
+        `"${b.trainerName || '-'}"`,
+        b.totalPrice,
+        b.commissionAmount || 0,
+        b.totalPrice - (b.commissionAmount || 0)
+      ].join(','));
+    });
+    // Summary rows
+    rows.push('');
+    rows.push(['SUMMARY', '', '', '', '', '', '', '', '', ''].join(','));
+    rows.push(['Total Revenue', '', '', '', '', '', '', totalRevenue, '', ''].join(','));
+    rows.push(['Total Commission Payable', '', '', '', '', '', '', totalCommission, '', ''].join(','));
+    rows.push(['Net Revenue', '', '', '', '', '', '', totalNet, '', ''].join(','));
+
+    const blob = new Blob(['\uFEFF' + rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `thaikick_report_${filterDateFrom || 'all'}_to_${filterDateTo || 'all'}_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   // Filter Bookings for Attendance
   const attendanceList = bookings.filter(b => {
@@ -381,6 +469,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ bookings, applications,
     const isPaid = b.status === 'confirmed' || b.status === 'completed';
     return matchDate && matchGym && isPaid;
   });
+
 
   return (
     <div className="max-w-[1440px] mx-auto px-4 sm:px-10 py-12 animate-reveal min-h-[80vh]">
@@ -396,87 +485,108 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ bookings, applications,
         </div>
       </div>
 
-      {/* Metrics Row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-        <div className="bg-white border-2 border-brand-charcoal p-6 flex items-center justify-between">
-          <div>
-            <Mono className="text-brand-blue">Total Platform Revenue</Mono>
-            <div className="text-2xl md:text-3xl font-black mt-2">฿{totalRevenue.toLocaleString()}</div>
+      {/* ── Analytics Report Panel ─────────────────────────────── */}
+      <div className="mb-12 border-2 border-brand-charcoal bg-white shadow-[8px_8px_0px_0px_#1A1A1A]">
+        {/* Panel Header */}
+        <div className="p-5 border-b-2 border-brand-charcoal bg-brand-bone flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div className="flex items-center gap-3">
+            <Activity className="w-5 h-5 text-brand-red animate-pulse" />
+            <div>
+              <div className="font-black uppercase text-sm">Revenue & Booking Report</div>
+              <div className="font-mono text-[10px] text-gray-500">{filteredBookings.length} bookings matching filters</div>
+            </div>
           </div>
-          <DollarSign className="w-8 h-8 text-gray-200" />
+          <button
+            onClick={handleExportCSV}
+            className="flex items-center gap-2 bg-brand-charcoal text-white px-5 py-2 font-mono text-xs font-bold uppercase hover:bg-brand-blue transition-colors"
+          >
+            <Package className="w-3 h-3" /> Export CSV
+          </button>
         </div>
-        <div className="bg-white border-2 border-brand-charcoal p-6 flex items-center justify-between">
+
+        {/* Filters */}
+        <div className="p-5 border-b border-gray-100 bg-gray-50 grid grid-cols-2 md:grid-cols-4 gap-3">
           <div>
-            <Mono className="text-brand-blue">Affiliate Payouts</Mono>
-            <div className="text-2xl md:text-3xl font-black mt-2">฿{totalCommission.toLocaleString()}</div>
+            <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">From Date</label>
+            <input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)}
+              className="w-full border border-gray-200 p-2 font-mono text-xs" />
           </div>
-          <Users className="w-8 h-8 text-gray-200" />
+          <div>
+            <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">To Date</label>
+            <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)}
+              className="w-full border border-gray-200 p-2 font-mono text-xs" />
+          </div>
+          <div>
+            <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Gym</label>
+            <select value={filterGymId} onChange={e => setFilterGymId(e.target.value)}
+              className="w-full border border-gray-200 p-2 font-mono text-xs bg-white">
+              <option value="all">All Gyms</option>
+              {gyms.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Status</label>
+            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+              className="w-full border border-gray-200 p-2 font-mono text-xs bg-white">
+              <option value="all">All Statuses</option>
+              <option value="confirmed">Confirmed</option>
+              <option value="completed">Completed</option>
+              <option value="pending">Pending</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
         </div>
-        <div className="bg-white border-2 border-brand-charcoal p-6 flex items-center justify-between">
-          <div>
-            <Mono className="text-brand-blue">Pending Requests</Mono>
-            <div className="text-2xl md:text-3xl font-black mt-2">{applications.length}</div>
+
+        {/* KPI Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 divide-x-2 divide-y-2 md:divide-y-0 divide-brand-charcoal/10 border-b border-gray-100">
+          <div className="p-5">
+            <Mono className="text-gray-400">Total Bookings</Mono>
+            <div className="text-3xl font-black mt-1">{filteredBookings.length}</div>
           </div>
-          <Activity className="w-8 h-8 text-brand-red animate-pulse" />
+          <div className="p-5">
+            <Mono className="text-brand-blue">Revenue</Mono>
+            <div className="text-3xl font-black mt-1">฿{totalRevenue.toLocaleString()}</div>
+          </div>
+          <div className="p-5">
+            <Mono className="text-brand-red">Commission Payable</Mono>
+            <div className="text-3xl font-black mt-1 text-brand-red">฿{totalCommission.toLocaleString()}</div>
+          </div>
+          <div className="p-5 bg-brand-charcoal text-white">
+            <Mono className="text-brand-bone opacity-70">Net Revenue</Mono>
+            <div className="text-3xl font-black mt-1">฿{totalNet.toLocaleString()}</div>
+          </div>
+        </div>
+
+        {/* Gym Performance Table */}
+        <div className="p-5">
+          <div className="font-mono text-xs uppercase font-bold text-gray-400 mb-3">Gym Performance</div>
+          {gymPerfList.length === 0 ? (
+            <div className="text-center font-mono text-xs text-gray-400 py-8">No booking data for selected filters</div>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {gymPerfList.map(gym => (
+                <div key={gym.name} className="flex items-center justify-between py-3 gap-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="font-bold text-sm uppercase truncate">{gym.name}</div>
+                    <span className="font-mono text-[10px] text-gray-400 shrink-0">{gym.bookings} bookings</span>
+                  </div>
+                  <div className="flex items-center gap-6 shrink-0 text-right font-mono text-xs">
+                    <div><div className="text-gray-400">Revenue</div><div className="font-bold">฿{gym.revenue.toLocaleString()}</div></div>
+                    <div><div className="text-brand-red">Commission</div><div className="font-bold text-brand-red">฿{gym.commission.toLocaleString()}</div></div>
+                    <div><div className="text-gray-400">Net</div><div className="font-bold">฿{(gym.revenue - gym.commission).toLocaleString()}</div></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
-
-      {/* Analytics Navigation */}
-      <div className="mb-12 animate-reveal" style={{ animationDelay: '0.1s' }}>
-        <div className="bg-brand-charcoal p-8 border-2 border-brand-charcoal flex flex-col md:flex-row items-center justify-between gap-6 shadow-[8px_8px_0px_0px_#AE3A17] group hover:bg-white hover:text-brand-charcoal transition-all duration-300">
-          <div>
-            <h3 className="text-2xl font-black uppercase text-white group-hover:text-brand-charcoal mb-2 flex items-center gap-2">
-              <Activity className="w-6 h-6 text-brand-red animate-pulse" />
-              Business Intelligence
-            </h3>
-            <p className="font-mono text-xs text-brand-blue group-hover:text-brand-charcoal/70">
-              View deep insights, revenue trends, and download CSV reports.
-            </p>
-          </div>
-
-          <div className="flex gap-4">
-            <button
-              onClick={() => {
-                const csvRows = [];
-                // Headers
-                csvRows.push(['Booking ID', 'Date', 'Type', 'Status', 'Gym Name', 'User Name', 'Trainer Name', 'Total Price', 'Commission Amount'].join(','));
-
-                // Rows
-                bookings.forEach(b => {
-                  csvRows.push([
-                    b.id,
-                    b.date,
-                    b.type,
-                    b.status,
-                    `"${b.gymName}"`,
-                    `"${b.userName}"`,
-                    `"${b.trainerName || ''}"`,
-                    b.totalPrice,
-                    b.commissionAmount || 0
-                  ].join(','));
-                });
-
-                const csvString = csvRows.join('\n');
-                const blob = new Blob([csvString], { type: 'text/csv' });
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.setAttribute('hidden', '');
-                a.setAttribute('href', url);
-                a.setAttribute('download', `bookings_export_${new Date().toISOString().split('T')[0]}.csv`);
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-              }}
-              className="px-6 py-4 bg-brand-charcoal text-white font-black uppercase text-sm border-2 border-white hover:bg-white hover:text-brand-charcoal transition-all whitespace-nowrap"
-            >
-              Export CSV
-            </button>
-            <a href="#/analytics" className="px-8 py-4 bg-brand-red text-white font-black uppercase text-sm border-2 border-brand-red hover:bg-transparent hover:text-brand-red hover:border-brand-red transition-all whitespace-nowrap">
-              Launch Analytics Console
-            </a>
-          </div>
+      {/* Pending Affiliates Badge */}
+      {applications.length > 0 && (
+        <div className="mb-6 flex items-center gap-2 px-4 py-2 bg-brand-red text-white font-mono text-xs font-bold uppercase w-fit shadow-[4px_4px_0px_0px_#1A1A1A]">
+          <Activity className="w-3 h-3 animate-pulse" /> {applications.length} Pending Affiliate Request(s)
         </div>
-      </div>
+      )}
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-12 pb-12">
         {/* Left Column: Actions */}
@@ -621,12 +731,29 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ bookings, applications,
                         </select>
                       </div>
                       <div className="grid grid-cols-2 gap-4 mt-2">
-                        <input
-                          className="border p-2 font-mono text-xs bg-white w-full"
-                          placeholder="Image URL"
-                          value={editingGym?.images?.[0] || ''}
-                          onChange={e => setEditingGym({ ...editingGym, images: [e.target.value] })}
-                        />
+                        <div className="flex gap-2 items-center">
+                          {editingGym?.images?.[0] && <img src={editingGym.images[0]} className="w-10 h-10 object-cover border" alt="Preview" />}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="border p-2 font-mono text-xs bg-white w-full file:mr-2 file:border-0 file:bg-brand-charcoal file:text-white file:text-xs file:px-2 file:cursor-pointer"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                try {
+                                  e.target.disabled = true;
+                                  const { uploadImage } = await import('../services/dataService');
+                                  const url = await uploadImage('gyms', file);
+                                  if (url) setEditingGym({ ...editingGym, images: [url] });
+                                } catch (err) {
+                                  alert("Failed to upload image");
+                                } finally {
+                                  e.target.disabled = false;
+                                }
+                              }
+                            }}
+                          />
+                        </div>
                         <input
                           className="border p-2 font-mono text-xs bg-white w-full"
                           placeholder="Location"
@@ -718,10 +845,24 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ bookings, applications,
                               onChange={e => setNewTrainer({ ...newTrainer, pricePerSession: Number(e.target.value) })}
                             />
                             <input
-                              className="border p-1 text-[10px] font-mono bg-gray-50 w-full"
-                              placeholder="Image URL"
-                              value={newTrainer.image}
-                              onChange={e => setNewTrainer({ ...newTrainer, image: e.target.value })}
+                              type="file"
+                              accept="image/*"
+                              className="border p-1 text-[10px] font-mono bg-gray-50 w-full file:mr-2 file:border-0 file:bg-brand-charcoal file:text-white file:text-[10px] file:px-2 file:cursor-pointer"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  try {
+                                    e.target.disabled = true;
+                                    const { uploadImage } = await import('../services/dataService');
+                                    const url = await uploadImage('trainers', file);
+                                    if (url) setNewTrainer({ ...newTrainer, image: url });
+                                  } catch (err) {
+                                    alert("Failed to upload image");
+                                  } finally {
+                                    e.target.disabled = false;
+                                  }
+                                }
+                              }}
                             />
                             <button type="button" onClick={handleAddTrainer} className="bg-brand-blue text-white px-2 rounded hover:bg-blue-600 flex items-center justify-center">
                               <Plus className="w-3 h-3" />
@@ -742,7 +883,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ bookings, applications,
 
             <div className="max-h-[300px] overflow-y-auto divide-y divide-gray-100">
               {gyms.map(g => (
-                <div key={g.id} className={`p-4 flex justify-between items-center hover:bg-gray-50 group ${g.isVerified ? '' : 'bg-red-50/50'}`}>
+                <div key={g.id} className={`p-4 flex justify-between items-center hover:bg-gray-50 group border-l-4 ${g.approvalStatus === 'approved' ? 'border-green-500' : g.approvalStatus === 'rejected' ? 'bg-red-50/50 border-red-500' : 'bg-orange-50/20 border-orange-500'}`}>
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-gray-200 shrink-0 overflow-hidden border border-gray-300">
                       {g.images?.[0] && <img src={g.images[0]} className="w-full h-full object-cover" />}
@@ -750,30 +891,60 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ bookings, applications,
                     <div>
                       <div className="font-bold text-sm uppercase text-brand-charcoal flex items-center gap-2">
                         {g.name}
-                        {g.isVerified ? (
-                          <span title="Verified"><Check className="w-3 h-3 text-green-500" /></span>
+                        {g.approvalStatus === 'approved' ? (
+                          <span title="Verified" className="text-green-500 flex items-center gap-1 text-[10px]"><Check className="w-3 h-3" /> Approved</span>
+                        ) : g.approvalStatus === 'rejected' ? (
+                          <span className="bg-red-500 text-white text-[9px] px-1 rounded-sm uppercase tracking-wider">Rejected</span>
                         ) : (
-                          <span className="bg-red-500 text-white text-[9px] px-1 rounded-sm uppercase tracking-wider">Unverified</span>
+                          <span className="bg-orange-500 text-white text-[9px] px-1 rounded-sm uppercase tracking-wider animate-pulse">Pending Review</span>
                         )}
                       </div>
                       <div className="font-mono text-xs text-gray-400">{g.location} • ฿{g.basePrice}</div>
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <button
-                      onClick={async () => {
-                        try {
-                          await updateGym(g.id, { isVerified: !g.isVerified });
-                          await loadGyms();
-                        } catch (err) {
-                          console.error(err);
-                          alert("Failed to update gym verification status");
-                        }
-                      }}
-                      className={`font-mono text-[10px] font-bold uppercase px-2 py-1 transition-colors ${g.isVerified ? 'text-gray-500 border border-gray-300 hover:bg-gray-100' : 'bg-green-500 text-white hover:bg-green-600'}`}
-                    >
-                      {g.isVerified ? 'Revoke' : 'Verify'}
-                    </button>
+                    {g.approvalStatus === 'pending' ? (
+                      <>
+                        <button
+                          onClick={async () => {
+                            try {
+                              await updateGymApprovalStatus(g.id, 'approved');
+                              await loadGyms();
+                            } catch (err) {
+                              alert("Failed to approve gym");
+                            }
+                          }}
+                          className="font-mono text-[10px] font-bold uppercase px-2 py-1 bg-green-500 text-white hover:bg-green-600 transition-colors"
+                        >Approve</button>
+                        <button
+                          onClick={async () => {
+                            try {
+                              await updateGymApprovalStatus(g.id, 'rejected');
+                              await loadGyms();
+                            } catch (err) {
+                              alert("Failed to reject gym");
+                            }
+                          }}
+                          className="font-mono text-[10px] font-bold uppercase px-2 py-1 bg-red-500 text-white hover:bg-red-600 transition-colors"
+                        >Reject</button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={async () => {
+                          try {
+                            const newStatus = g.approvalStatus === 'approved' ? 'rejected' : 'approved';
+                            await updateGymApprovalStatus(g.id, newStatus);
+                            await loadGyms();
+                          } catch (err) {
+                            console.error(err);
+                            alert("Failed to update gym verification status");
+                          }
+                        }}
+                        className={`font-mono text-[10px] font-bold uppercase px-2 py-1 transition-colors ${g.approvalStatus === 'approved' ? 'text-gray-500 border border-gray-300 hover:bg-gray-100' : 'bg-gray-800 text-white hover:bg-gray-900'}`}
+                      >
+                        {g.approvalStatus === 'approved' ? 'Revoke' : 'Re-Approve'}
+                      </button>
+                    )}
                     <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button onClick={() => { setEditingGym(g); setIsGymFormOpen(true); }} className="p-2 hover:bg-blue-100 text-brand-blue rounded">
                         <Edit className="w-4 h-4" />

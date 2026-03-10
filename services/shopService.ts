@@ -120,6 +120,7 @@ export const getShopOrders = async (): Promise<ShopOrder[]> => {
         paymentStatus: o.payment_status,
         paymentVerifiedAt: o.payment_verified_at,
         adminNotes: o.admin_notes,
+        trackingNumber: o.tracking_number,
         createdAt: o.created_at,
         items: o.items?.map((item: any) => ({
             id: item.id,
@@ -159,6 +160,7 @@ export const getUserShopOrders = async (userId: string): Promise<ShopOrder[]> =>
         paymentStatus: o.payment_status,
         paymentVerifiedAt: o.payment_verified_at,
         adminNotes: o.admin_notes,
+        trackingNumber: o.tracking_number,
         createdAt: o.created_at,
         items: o.items?.map((item: any) => ({
             id: item.id,
@@ -215,6 +217,15 @@ export const updateShopOrderStatus = async (id: string, status: ShopOrder['statu
     const { error } = await supabase
         .from('shop_orders')
         .update({ status })
+        .eq('id', id);
+
+    if (error) throw error;
+};
+
+export const updateTrackingNumber = async (id: string, trackingNumber: string) => {
+    const { error } = await supabase
+        .from('shop_orders')
+        .update({ tracking_number: trackingNumber })
         .eq('id', id);
 
     if (error) throw error;

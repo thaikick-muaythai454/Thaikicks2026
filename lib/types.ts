@@ -35,6 +35,7 @@ export interface Gym {
   flashSaleDiscount: number;
   affiliatePercentage?: number;
   isVerified?: boolean;
+  approvalStatus?: 'pending' | 'approved' | 'rejected';
   bio?: string;
   socialMedia?: string;
   profilePhoto?: string;
@@ -129,6 +130,7 @@ export interface ShopOrder {
   paymentStatus?: string;
   paymentVerifiedAt?: string;
   adminNotes?: string;
+  trackingNumber?: string;
   createdAt: string;
   items?: ShopOrderItem[];
 }

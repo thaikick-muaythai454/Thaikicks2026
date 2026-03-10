@@ -122,7 +122,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ gyms, user, setBookings }) =>
 
     useEffect(() => {
         const foundGym = gyms.find(g => g.id === gymId);
-        if (foundGym) {
+        if (foundGym && (foundGym.isVerified || foundGym.approvalStatus === 'approved')) {
             setGym(foundGym);
         } else {
             navigate('/');
@@ -295,7 +295,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ gyms, user, setBookings }) =>
             <div className="max-w-[1440px] mx-auto grid grid-cols-1 lg:grid-cols-2 min-h-screen">
                 <div className="relative h-[300px] lg:h-auto bg-gray-900 border-r-2 border-brand-charcoal order-1 lg:order-none">
                     <img
-                        src={gym.images[0]}
+                        src={gym.images?.[0] || gym.profilePhoto || 'https://via.placeholder.com/600x400?text=No+Image'}
                         alt={gym.name}
                         className="w-full h-full object-cover opacity-60 grayscale mix-blend-luminosity"
                     />

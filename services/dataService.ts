@@ -41,6 +41,7 @@ export const getGyms = async (): Promise<Gym[]> => {
         flashSaleDiscount: gym.flash_sale_discount,
         affiliatePercentage: gym.affiliate_percentage,
         isVerified: gym.is_verified,
+        approvalStatus: gym.approval_status || 'pending',
         bio: gym.bio,
         socialMedia: gym.social_media,
         profilePhoto: gym.profile_photo
@@ -82,6 +83,7 @@ export const getGymById = async (id: string): Promise<Gym | null> => {
         flashSaleDiscount: data.flash_sale_discount,
         affiliatePercentage: data.affiliate_percentage,
         isVerified: data.is_verified,
+        approvalStatus: data.approval_status || 'pending',
         bio: data.bio,
         socialMedia: data.social_media,
         profilePhoto: data.profile_photo
@@ -100,6 +102,7 @@ export const createGym = async (gym: Partial<Gym>) => {
         owner_id: gym.ownerId, // Optional, might be null for admin created
         affiliate_percentage: gym.affiliatePercentage || 0,
         is_verified: gym.isVerified ?? false,
+        approval_status: gym.approvalStatus || 'pending',
         bio: gym.bio || '',
         social_media: gym.socialMedia || '',
         profile_photo: gym.profilePhoto || ''
@@ -125,6 +128,7 @@ export const updateGym = async (id: string, gym: Partial<Gym>) => {
     if (gym.basePrice !== undefined) dbGym.base_price = gym.basePrice;
     if (gym.affiliatePercentage !== undefined) dbGym.affiliate_percentage = gym.affiliatePercentage;
     if (gym.isVerified !== undefined) dbGym.is_verified = gym.isVerified;
+    if (gym.approvalStatus !== undefined) dbGym.approval_status = gym.approvalStatus;
     if (gym.bio !== undefined) dbGym.bio = gym.bio;
     if (gym.socialMedia !== undefined) dbGym.social_media = gym.socialMedia;
     if (gym.profilePhoto !== undefined) dbGym.profile_photo = gym.profilePhoto;
@@ -140,6 +144,34 @@ export const updateGym = async (id: string, gym: Partial<Gym>) => {
         .single();
 
     if (error) throw error;
+    return data;
+};
+
+export const updateGymApprovalStatus = async (id: string, newStatus: 'pending' | 'approved' | 'rejected') => {
+    // 1. Update in DB
+    const { data, error } = await supabase
+        .from('gyms')
+        .update({
+            approval_status: newStatus,
+            is_verified: newStatus === 'approved'
+        })
+        .eq('id', id)
+        .select()
+        .single();
+    if (error) throw error;
+
+    // 2. Trigger Email Notification via Edge Function
+    try {
+        await supabase.functions.invoke('gym-approval-email', {
+            body: {
+                gymId: id,
+                newStatus
+            }
+        });
+    } catch (e) {
+        console.error("Failed to send approval status email via Edge Function", e);
+    }
+
     return data;
 };
 
@@ -423,20 +455,30 @@ export const getGymBookings = async (gymId: string): Promise<Booking[]> => {
 // --- Affiliate Services ---
 
 export const createAffiliateApplication = async (userId: string, reason: string) => {
-    const { data, error } = await supabase
+    // Check if any existing application exists for this user
+    const { data: existing } = await supabase
         .from('affiliate_applications')
-        .insert({
-            user_id: userId,
-            reason: reason,
-            status: 'pending'
-        })
-        .select()
-        .single();
+        .select('id')
+        .eq('user_id', userId)
+        .limit(1)
+        .maybeSingle();
+
+    let error;
+    if (existing) {
+        // Re-apply: reset ALL existing records for this user back to pending
+        ({ error } = await supabase
+            .from('affiliate_applications')
+            .update({ status: 'pending', reason })
+            .eq('user_id', userId));
+    } else {
+        ({ error } = await supabase
+            .from('affiliate_applications')
+            .insert({ user_id: userId, reason, status: 'pending' }));
+    }
 
     if (error) throw error;
 
     await supabase.from('users').update({ affiliate_status: 'pending' }).eq('id', userId);
-    return data;
 };
 
 export const getAffiliateApplications = async () => {
@@ -609,6 +651,50 @@ export const updateUserRole = async (userId: string, role: string) => {
         .eq('id', userId);
 
     if (error) throw error;
+};
+
+export const updateUserProfile = async (userId: string, data: { name?: string, avatar_url?: string }) => {
+    const { error } = await supabase
+        .from('users')
+        .update(data)
+        .eq('id', userId);
+
+    if (error) throw error;
+};
+
+export const uploadAvatar = async (userId: string, file: File): Promise<string | null> => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${userId}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+    const filePath = `${userId}/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file, { upsert: true });
+
+    if (uploadError) {
+        console.error('Error uploading avatar:', uploadError);
+        throw uploadError;
+    }
+
+    const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
+    return data.publicUrl;
+};
+
+export const uploadImage = async (folderName: string, file: File): Promise<string | null> => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${folderName}/${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+    const { error: uploadError } = await supabase.storage
+        .from('public-images')
+        .upload(fileName, file, { upsert: true });
+
+    if (uploadError) {
+        console.error('Error uploading image:', uploadError);
+        throw uploadError;
+    }
+
+    const { data } = supabase.storage.from('public-images').getPublicUrl(fileName);
+    return data.publicUrl;
 };
 
 

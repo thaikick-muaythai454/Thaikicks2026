@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingBag, Package, ArrowLeft, CheckCircle, Truck, X } from 'lucide-react';
+import { ShoppingBag, Package, ArrowLeft, Truck, Check } from 'lucide-react';
 import ProductManagement from './ProductManagement';
 import { ShopOrder } from '../lib/types';
-import { getShopOrders, updateShopOrderStatus } from '../services/shopService';
+import { getShopOrders, updateShopOrderStatus, updateTrackingNumber } from '../services/shopService';
 
 const ShopAdminPage: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'products' | 'orders'>('products');
     const [orders, setOrders] = useState<ShopOrder[]>([]);
+    const [trackingInputs, setTrackingInputs] = useState<Record<string, string>>({});
+    const [savingTracking, setSavingTracking] = useState<Record<string, boolean>>({});
 
     // Filters
     const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -21,6 +23,10 @@ const ShopAdminPage: React.FC = () => {
     const loadOrders = async () => {
         const data = await getShopOrders();
         setOrders(data);
+        // Initialize tracking inputs from DB values
+        const inputs: Record<string, string> = {};
+        data.forEach(o => { inputs[o.id] = o.trackingNumber || ''; });
+        setTrackingInputs(inputs);
     };
 
     const handleStatusUpdate = async (orderId: string, status: ShopOrder['status']) => {
@@ -30,6 +36,26 @@ const ShopAdminPage: React.FC = () => {
         } catch (error) {
             console.error('Failed to update order status', error);
             alert('Failed to update order status');
+        }
+    };
+
+    const handleSaveTracking = async (orderId: string) => {
+        const tracking = trackingInputs[orderId]?.trim();
+        if (!tracking) return alert('Please enter a tracking number');
+        setSavingTracking(prev => ({ ...prev, [orderId]: true }));
+        try {
+            await updateTrackingNumber(orderId, tracking);
+            // Auto-update status to shipped when tracking is added
+            const order = orders.find(o => o.id === orderId);
+            if (order && order.status === 'paid') {
+                await updateShopOrderStatus(orderId, 'shipped');
+            }
+            await loadOrders();
+        } catch (err) {
+            console.error(err);
+            alert('Failed to save tracking number');
+        } finally {
+            setSavingTracking(prev => ({ ...prev, [orderId]: false }));
         }
     };
 
@@ -186,7 +212,8 @@ const ShopAdminPage: React.FC = () => {
                                                         </div>
                                                     )}
 
-                                                    <div className="flex items-center gap-3">
+                                                    {/* Status + Tracking Row */}
+                                                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mt-3">
                                                         <span className={`px-3 py-1 text-xs font-bold uppercase border ${getStatusColor(order.status)}`}>
                                                             {order.status}
                                                         </span>
@@ -201,6 +228,40 @@ const ShopAdminPage: React.FC = () => {
                                                             <option value="delivered">Delivered</option>
                                                             <option value="cancelled">Cancelled</option>
                                                         </select>
+                                                    </div>
+
+                                                    {/* Tracking Number Section */}
+                                                    <div className="mt-3 border-t border-dashed border-gray-200 pt-3">
+                                                        <div className="flex items-center gap-2 mb-2">
+                                                            <Truck className="w-3 h-3 text-gray-400" />
+                                                            <span className="font-mono text-[10px] uppercase font-bold text-gray-400">Tracking Number</span>
+                                                            {order.trackingNumber && (
+                                                                <span className="bg-purple-100 text-purple-700 border border-purple-300 px-2 py-0.5 text-[10px] font-mono font-bold uppercase">
+                                                                    {order.trackingNumber}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <div className="flex gap-2">
+                                                            <input
+                                                                type="text"
+                                                                placeholder={order.trackingNumber ? `Current: ${order.trackingNumber}` : "e.g. TH123456789TH"}
+                                                                value={trackingInputs[order.id] || ''}
+                                                                onChange={e => setTrackingInputs(prev => ({ ...prev, [order.id]: e.target.value }))}
+                                                                className="flex-1 border border-gray-300 px-3 py-1.5 font-mono text-xs focus:outline-none focus:border-brand-blue uppercase"
+                                                            />
+                                                            <button
+                                                                onClick={() => handleSaveTracking(order.id)}
+                                                                disabled={savingTracking[order.id] || !trackingInputs[order.id]?.trim()}
+                                                                className="flex items-center gap-1 bg-brand-charcoal text-white px-4 py-1.5 font-mono text-xs font-bold uppercase hover:bg-brand-blue transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                                            >
+                                                                {savingTracking[order.id] ? '...' : <><Check className="w-3 h-3" /> Save</>}
+                                                            </button>
+                                                        </div>
+                                                        {!order.trackingNumber && order.status === 'paid' && (
+                                                            <p className="text-[10px] font-mono text-gray-400 mt-1">
+                                                                💡 Saving tracking will auto-update status to Shipped
+                                                            </p>
+                                                        )}
                                                     </div>
                                                 </div>
                                             );
@@ -217,3 +278,5 @@ const ShopAdminPage: React.FC = () => {
 };
 
 export default ShopAdminPage;
+
+
