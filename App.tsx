@@ -1,7 +1,6 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, Link, useNavigate } from 'react-router-dom';
-import { Square, TrendingUp, ShoppingBag } from 'lucide-react';
+import { Shield, Activity, Users, MapPin, Star, Calendar, MessageSquare, Menu, X, ArrowRight, CheckCircle, ChevronDown, Award, PlayCircle, BookOpen, Layers, ShoppingBag, Trash2, Edit, Check, Link as LinkIcon, Square, TrendingUp } from 'lucide-react';
 
 import AffiliateTracker from './components/AffiliateTracker';
 import Navbar from './components/Navbar';
@@ -22,7 +21,7 @@ import CookieBanner from './components/CookieBanner';
 
 import { BOOKINGS, AFFILIATE_APPLICATIONS } from './lib/data';
 import { USERS } from './lib/auth-data';
-import { Gym, User, Booking } from './lib/types';
+import { Gym, User, Booking, Product } from './lib/types';
 import {
   getGyms,
   getUserBookings,
@@ -32,7 +31,8 @@ import {
   updateUserAffiliateStatus,
   getAnnouncements, // Added import
   getAllBookings,
-  getGymBookings
+  getGymBookings,
+  getSystemSetting
 } from './services/dataService';
 import { getCurrentUser } from './services/authService';
 import { supabase } from './lib/supabaseClient';
@@ -732,9 +732,32 @@ const App: React.FC = () => {
   const [gyms, setGyms] = useState<Gym[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]); // Start empty, fetch real data
   const [applications, setApplications] = useState<any[]>([]);
+  const [shopProducts, setShopProducts] = useState<Product[]>([]); // Added shopProducts state
 
   const [notification, setNotification] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
 
+  // ─────────────────────────────────────────────────────────────────────────────
+  // HERO CAROUSEL STATE
+  // ─────────────────────────────────────────────────────────────────────────────
+  const [currentHeroIndex, setCurrentHeroIndex] = useState(0);
+  const [heroImages, setHeroImages] = useState<string[]>([
+    // Fallback image if none are loaded from settings
+    'https://images.unsplash.com/photo-1599552375107-160de4e511cf?auto=format&fit=crop&q=80'
+  ]);
+
+  useEffect(() => {
+    if (heroImages.length <= 1) return;
+
+    const interval = setInterval(() => {
+      setCurrentHeroIndex((prev) => (prev + 1) % heroImages.length);
+    }, 5000); // Rotate every 5 seconds
+
+    return () => clearInterval(interval);
+  }, [heroImages]);
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // RENDER HELPERS
+  // ─────────────────────────────────────────────────────────────────────────────
   // Initial Data Fetch & Auth Subscription
   React.useEffect(() => {
     let mounted = true;
@@ -874,6 +897,21 @@ const App: React.FC = () => {
             */
           }
           setBookings(bookingsToShow);
+          const { getProducts } = await import('./services/shopService');
+          getProducts().then(prods => setShopProducts(prods || [])).catch(console.error);
+
+          // Load dynamic hero images
+          const heroSetting = await getSystemSetting('hero_images');
+          if (heroSetting) {
+            try {
+              const urls = JSON.parse(heroSetting);
+              if (Array.isArray(urls) && urls.length > 0) {
+                setHeroImages(urls);
+              }
+            } catch (e) {
+              console.error("Failed to parse hero_images", e);
+            }
+          }
         }
       } catch (err) {
         console.warn("Failed to load user data", err);
@@ -1003,7 +1041,7 @@ const App: React.FC = () => {
         </main>
 
         {/* Verified by ThaiKicks Trust Badge */}
-        <div className="bg-brand-blue py-12 border-y-2 border-brand-charcoal">
+        < div className="bg-brand-blue py-12 border-y-2 border-brand-charcoal" >
           <div className="max-w-[1440px] mx-auto px-4 sm:px-10 flex flex-col sm:flex-row items-center justify-center gap-6 text-white text-center sm:text-left">
             <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shrink-0 shadow-[4px_4px_0px_#1A1A1A]">
               <svg className="w-8 h-8 text-brand-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>
@@ -1013,7 +1051,7 @@ const App: React.FC = () => {
               <p className="font-mono text-sm opacity-80 mt-1 max-w-xl">Every camp on our platform goes through a rigorous on-site verification process to ensure authentic training, safe environments, and fair pricing.</p>
             </div>
           </div>
-        </div>
+        </div >
 
         <footer className="bg-brand-charcoal text-white py-24">
           <div className="max-w-[1440px] mx-auto px-4 sm:px-10 grid grid-cols-1 md:grid-cols-4 gap-12">
@@ -1051,8 +1089,8 @@ const App: React.FC = () => {
         <Chatbot />
         <CookieBanner />
 
-      </div>
-    </HashRouter>
+      </div >
+    </HashRouter >
   );
 };
 

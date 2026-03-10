@@ -30,11 +30,11 @@ const Navbar: React.FC<NavbarProps> = ({ activeUser, onLogout }) => {
 
   return (
     <>
-      <nav className="h-[200px] border-b border-brand-charcoal/10 sticky top-0 bg-[#F9F9F9]/90 backdrop-blur-md z-40">
+      <nav className="h-20 border-b border-brand-charcoal/10 sticky top-0 bg-[#F9F9F9]/90 backdrop-blur-md z-40">
         <div className="max-w-[1440px] mx-auto px-4 sm:px-10 h-full flex items-center justify-between">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-1 group -ml-2" onClick={closeMobileMenu}>
-            <img src="/tk-logo.png" alt="Thaikick" className="h-[140px] w-auto object-contain" />
+            <img src="/tk-logo.png" alt="Thaikick" className="h-14 w-auto object-contain" />
           </Link>
 
           {/* Center Links (Desktop) */}

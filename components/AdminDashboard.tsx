@@ -88,13 +88,27 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ bookings }) => {
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
   const [isProductFormOpen, setIsProductFormOpen] = useState(false);
 
+  // Appearance State
+  const [heroImages, setHeroImages] = useState<string[]>([]);
+  const [isUploadingHero, setIsUploadingHero] = useState(false);
+
   // Tabs
-  const [activeTab, setActiveTab] = useState<'overview' | 'gyms' | 'users' | 'announcements' | 'bookings' | 'courses' | 'shop' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'gyms' | 'users' | 'announcements' | 'bookings' | 'courses' | 'shop' | 'appearance' | 'settings'>('overview');
 
   useEffect(() => {
     const loadSettings = async () => {
       const number = await getSystemSetting('promptpay_number');
       if (number) setPromptPayNumber(number);
+
+      const heroSetting = await getSystemSetting('hero_images');
+      if (heroSetting) {
+        try {
+          // It's saved as a JSON string
+          setHeroImages(JSON.parse(heroSetting));
+        } catch (e) {
+          console.error("Failed to parse hero_images", e);
+        }
+      }
     };
 
     loadSettings();
@@ -395,6 +409,42 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ bookings }) => {
     }
   };
 
+  // --- Appearance Management ---
+  const handleHeroFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingHero(true);
+    try {
+      const { uploadImage } = await import('../services/dataService');
+      const url = await uploadImage('public-images', file);
+      if (url) {
+        const updatedImages = [...heroImages, url];
+        setHeroImages(updatedImages);
+        await updateSystemSetting('hero_images', JSON.stringify(updatedImages));
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to upload hero image");
+    } finally {
+      setIsUploadingHero(false);
+      // Reset the file input so the same file could be selected again if needed
+      e.target.value = '';
+    }
+  };
+
+  const handleDeleteHeroImage = async (index: number) => {
+    if (!confirm("Are you sure you want to remove this hero image?")) return;
+    try {
+      const updatedImages = [...heroImages];
+      updatedImages.splice(index, 1);
+      setHeroImages(updatedImages);
+      await updateSystemSetting('hero_images', JSON.stringify(updatedImages));
+    } catch (err) {
+      console.error(err);
+      alert("Failed to remove hero image");
+    }
+  };
 
   // ── Analytics State ──────────────────────────────────────────
   const [filterDateFrom, setFilterDateFrom] = React.useState('');
@@ -965,9 +1015,24 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ bookings }) => {
               <span className="font-mono text-xs text-brand-blue font-bold uppercase">Flexible Course Designer</span>
               <button
                 onClick={() => { setEditingCourse({ designData: { modules: [] } }); setIsCourseFormOpen(true); }}
-                className="bg-brand-charcoal text-white px-3 py-1 font-mono text-xs font-bold uppercase flex items-center gap-2 hover:bg-brand-blue"
+                className={`w-full text-left px-4 py-3 font-mono text-xs font-bold uppercase transition-colors flex items-center gap-3 ${activeTab === 'courses' ? 'bg-brand-blue text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'}`}
               >
-                <Plus className="w-3 h-3" /> New Course
+                <BookOpen className="w-4 h-4" />
+                Training Courses
+              </button>
+              <button
+                onClick={() => setActiveTab('appearance')}
+                className={`w-full text-left px-4 py-3 font-mono text-xs font-bold uppercase transition-colors flex items-center gap-3 ${activeTab === 'appearance' ? 'bg-brand-charcoal text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'}`}
+              >
+                <Layers className="w-4 h-4" />
+                Appearance
+              </button>
+              <button
+                onClick={() => setActiveTab('settings')}
+                className={`w-full text-left px-4 py-3 font-mono text-xs font-bold uppercase transition-colors flex items-center gap-3 ${activeTab === 'settings' ? 'bg-brand-charcoal text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'}`}
+              >
+                <Layers className="w-4 h-4" />
+                Settings
               </button>
             </div>
 
@@ -1124,224 +1189,66 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ bookings }) => {
             )}
           </BlockTable>
 
-        </div>
-
-        {/* Right Column: Data */}
-        <div className="space-y-12 min-w-0">
-
-          {/* New Section: Daily Attendance / Class Roster */}
-          <BlockTable title="Daily Attendance (Paid)" icon={<Users className="w-4 h-4" />}>
-            <div className="p-4 bg-gray-50 border-b border-gray-100 space-y-3">
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <input
-                    type="date"
-                    className={`border p-2 font-mono text-xs w-full bg-white pr-8 placeholder-transparent ${attendanceDate ? 'text-brand-charcoal' : 'text-transparent'}`}
-                    value={attendanceDate}
-                    onChange={e => setAttendanceDate(e.target.value)}
-                  />
-                  {!attendanceDate && (
-                    <div className="absolute inset-0 flex items-center px-4 pointer-events-none text-xs text-gray-400 font-mono">
-                      Show All
-                    </div>
-                  )}
-                  {attendanceDate && (
-                    <button
-                      onClick={() => setAttendanceDate('')}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-bold text-red-500 hover:text-red-700"
-                      title="Clear Date"
-                    >
-                      X
-                    </button>
-                  )}
-                </div>
-                <select
-                  className="border p-2 font-mono text-xs w-full bg-white flex-1"
-                  value={attendanceGymId}
-                  onChange={e => setAttendanceGymId(e.target.value)}
-                >
-                  <option value="all">All Locations</option>
-                  {gyms.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-                </select>
-              </div>
-              <div className="flex justify-between items-center px-2">
-                <span className="font-mono text-xs text-gray-500 font-bold uppercase">Total Attendees</span>
-                <span className="font-black text-2xl text-brand-charcoal">{attendanceList.length}</span>
-              </div>
-            </div>
-
-            <div className="max-h-[300px] overflow-y-auto divide-y divide-gray-100">
-              {attendanceList.length === 0 ? (
-                <div className="p-8 text-center font-mono text-xs text-gray-400">No attendees found</div>
-              ) : (
-                attendanceList.map(b => (
-                  <div key={b.id} className="p-3 bg-white hover:bg-gray-50">
-                    <div className="flex justify-between items-start mb-1">
-                      <span className="font-bold text-xs uppercase text-brand-charcoal">{b.userName || 'Guest'}</span>
-                      <div className="text-right">
-                        <span className="font-mono text-[10px] text-gray-400 block">{b.gymName}</span>
-                        <span className="font-mono text-[10px] text-brand-blue block">{b.date}</span>
-                      </div>
-                    </div>
-                    <div className="flex gap-2 mt-1">
-                      <span className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded ${b.type === 'private' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>
-                        {b.type === 'private' ? 'Private' : 'Standard'}
-                      </span>
-                      {b.type === 'private' && (
-                        <span className="text-[10px] text-gray-500 font-mono border border-gray-200 px-1">
-                          {b.trainerName} @ {b.startTime}
-                        </span>
-                      )}
-                    </div>
+          {/* Appearance Panel */}
+          {activeTab === 'appearance' && (
+            <BlockTable title="Appearance Settings" icon={<Layers className="w-4 h-4" />}>
+              <div className="p-6 bg-white space-y-8">
+                <div>
+                  <h4 className="font-black uppercase text-brand-charcoal mb-4">Hero Carousel Images</h4>
+                  <div className="text-sm font-mono text-gray-500 mb-6 border-l-2 border-brand-blue pl-4">
+                    Upload images to be displayed in the background of the Home page hero section. They will automatically rotate.
                   </div>
-                ))
-              )}
-            </div>
-          </BlockTable>
 
-          {/* User Registry */}
-          <BlockTable title="User Registry (Auth Data)" icon={<Shield className="w-4 h-4" />}>
-            <div className="max-h-[400px] overflow-auto">
-              <table className="w-full text-left border-collapse min-w-[500px]">
-                <thead className="bg-brand-bone font-mono text-xs font-bold text-brand-blue uppercase sticky top-0 z-10 shadow-sm">
-                  <tr>
-                    <th className="p-4 border-b-2 border-brand-charcoal bg-brand-bone">User</th>
-                    <th className="p-4 border-b-2 border-brand-charcoal bg-brand-bone">Role</th>
-                    <th className="p-4 border-b-2 border-brand-charcoal text-right bg-brand-bone">Affiliate</th>
-                  </tr>
-                </thead>
-                <tbody className="font-mono text-xs">
-                  {users.map(user => (
-                    <tr key={user.id} className="border-b border-gray-100 hover:bg-brand-bone/50">
-                      <td className="p-4 max-w-[200px]">
-                        <div className="font-bold text-brand-charcoal truncate" title={user.name}>{user.name}</div>
-                        <div className="text-gray-400 truncate" title={user.email}>{user.email}</div>
-                      </td>
-
-                      <td className="p-4 uppercase text-gray-600">
-                        <select
-                          value={user.role}
-                          onChange={(e) => handleRoleChange(user.id, e.target.value)}
-                          className="bg-transparent border-b border-gray-300 font-mono text-xs uppercase focus:outline-none focus:border-brand-blue"
-                        >
-                          <option value="customer">Customer</option>
-                          <option value="owner">Owner</option>
-                          <option value="admin">Admin</option>
-                        </select>
-                      </td>
-                      <td className="p-4 text-right">
-                        <span className={`px - 2 py - 1 border ${user.affiliateStatus === 'active' ? 'border-green-600 text-green-700 bg-green-50' :
-                          user.affiliateStatus === 'pending' ? 'border-brand-blue text-brand-blue bg-blue-50' : 'border-gray-200 text-gray-400'
-                          } `}>
-                          {user.affiliateStatus}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </BlockTable>
-
-          {/* Booking Ledger */}
-          <BlockTable title="Transaction Ledger" icon={<Activity className="w-4 h-4" />}>
-            {bookings.length === 0 ? (
-              <div className="p-8 text-center font-mono text-sm text-gray-400">NO TRANSACTIONS</div>
-            ) : (
-              <div className="divide-y-2 divide-gray-100 max-h-[500px] overflow-y-auto">
-                {bookings.slice().reverse().map(b => (
-                  <div key={b.id} className="p-4 hover:bg-gray-50 transition-colors">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="font-mono text-xs text-gray-400">{b.date}</span>
-                      <span className={`font - mono text - [10px] font - bold px - 2 uppercase ${b.status === 'completed' ? 'text-green-600 bg-green-50' : 'text-brand-blue bg-blue-50'} `}>
-                        {b.status}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center gap-4">
-                      <div className="min-w-0">
-                        <div className="font-bold text-sm text-brand-charcoal uppercase truncate">{b.gymName}</div>
-                        <div className="font-mono text-xs text-gray-500 truncate">User: {b.userName.split(' ')[0]}</div>
+                  {/* List of current hero images */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    {heroImages.map((url, idx) => (
+                      <div key={idx} className="relative group border border-gray-200 aspect-video md:aspect-square bg-gray-100 overflow-hidden">
+                        <img src={url} alt={`Hero ${idx + 1}`} className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <button
+                            onClick={() => handleDeleteHeroImage(idx)}
+                            className="bg-brand-red text-white p-2 rounded-full hover:bg-white hover:text-brand-red transition-colors"
+                            title="Remove Image"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
-                      <div className="text-right shrink-0">
-                        <div className="font-black text-brand-charcoal">฿{b.totalPrice}</div>
-                        {b.commissionAmount > 0 && (
-                          <div className="font-mono text-[10px] text-brand-red">
-                            Comm: ฿{b.commissionAmount}
-                          </div>
-                        )}
+                    ))}
+                    {heroImages.length === 0 && (
+                      <div className="col-span-2 md:col-span-4 p-8 border-2 border-dashed border-gray-300 text-center font-mono text-sm text-gray-400">
+                        No hero images uploaded yet.<br />Default placeholder will be shown.
                       </div>
-                    </div>
+                    )}
                   </div>
-                ))}
-              </div>
-            )}
-          </BlockTable>
 
-          {/* Shop Management Navigation */}
-          <div className="bg-white border-2 border-brand-charcoal p-8 flex flex-col md:flex-row items-center justify-between gap-6 shadow-[8px_8px_0px_0px_#AE3A17] group hover:bg-brand-bone transition-all duration-300">
-            <div>
-              <h3 className="text-2xl font-black uppercase text-brand-charcoal mb-2 flex items-center gap-2">
-                <ShoppingBag className="w-6 h-6 text-brand-blue" />
-                E-Commerce Management
-              </h3>
-              <p className="font-mono text-xs text-gray-600">
-                Manage products, inventory, orders, and shop settings.
-              </p>
-            </div>
-            <a
-              href="#/shop-admin"
-              className="px-8 py-4 bg-brand-charcoal text-white font-black uppercase text-sm border-2 border-brand-charcoal hover:bg-brand-blue hover:border-brand-blue transition-all whitespace-nowrap"
-            >
-              Open Shop Admin
-            </a>
-          </div>
-
-          {/* System Logs (Static) */}
-          <div className="bg-brand-charcoal text-gray-400 p-6 border-2 border-brand-charcoal font-mono text-[10px] space-y-2 overflow-hidden shadow-[8px_8px_0px_0px_#AE3A17]">
-            <div className="text-white font-bold border-b border-gray-600 pb-2 mb-2">SYSTEM LOGS</div>
-            <p className="truncate">&gt; [SYSTEM] Initialized 3 Gym nodes</p>
-            <p className="truncate">&gt; [SYSTEM] Loaded {users.length} user profiles from auth-data</p>
-            <p className="truncate">&gt; [AFFILIATE] Tracking cookie expiry set to 30 days</p>
-            <p className="truncate">&gt; [BOT] Kru AI agent connected successfully</p>
-            <p className="animate-pulse truncate">&gt; [MONITOR] Watching for new bookings...</p>
-          </div>
-        </div>
-        {
-          activeTab === 'settings' && (
-            <DashboardContainer title="System Settings" subtitle="Configuration">
-              <div className="max-w-xl">
-                <BlockTable title="Payment Configuration" icon={<DollarSign className="w-4 h-4" />}>
-                  <div className="p-8 space-y-6">
-                    <div>
-                      <label className="font-mono text-xs font-bold text-brand-blue block mb-2 uppercase">PromptPay Number</label>
+                  {/* Upload new image */}
+                  <div>
+                    <label className={`block flex items-center justify-center border-2 border-brand-charcoal border-dashed p-6 cursor-pointer hover:bg-brand-bone transition-colors ${isUploadingHero ? 'opacity-50 pointer-events-none' : ''}`}>
+                      <div className="flex flex-col items-center">
+                        <Plus className="w-6 h-6 text-brand-charcoal mb-2" />
+                        <span className="font-mono text-sm font-bold uppercase text-brand-charcoal">
+                          {isUploadingHero ? 'Uploading...' : 'Add New Image'}
+                        </span>
+                        <span className="font-mono text-[10px] text-gray-500 mt-1">Recommended: High quality, landscape orientation</span>
+                      </div>
                       <input
-                        type="text"
-                        value={promptPayNumber}
-                        onChange={(e) => setPromptPayNumber(e.target.value)}
-                        className="w-full border-2 border-brand-charcoal p-3 font-mono text-lg"
-                        placeholder="08X-XXX-XXXX"
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleHeroFileUpload}
+                        disabled={isUploadingHero}
                       />
-                      <p className="mt-2 font-mono text-xs text-gray-400">
-                        This number will be used to generate dynamic QR codes for payments.
-                      </p>
-                    </div>
-
-                    <button
-                      onClick={handleSaveSettings}
-                      disabled={isSettingsLoading}
-                      className="bg-brand-charcoal text-white font-bold uppercase py-3 px-8 hover:bg-brand-red transition-colors shadow-[4px_4px_0px_0px_rgba(0,0,0,0.2)]"
-                    >
-                      {isSettingsLoading ? 'Saving...' : 'Save Configuration'}
-                    </button>
+                    </label>
                   </div>
-                </BlockTable>
+                </div>
               </div>
-            </DashboardContainer>
-          )
-        }
+            </BlockTable>
+          )}
 
-      </div >
-    </div >
+        </div>
+      </div>
+    </div>
   );
 };
 
