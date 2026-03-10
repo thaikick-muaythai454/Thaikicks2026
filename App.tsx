@@ -110,7 +110,14 @@ const GymCard: React.FC<{ gym: Gym; onBook: () => void; isLarge?: boolean }> = (
   </div>
 );
 
-const HomePage: React.FC<{ user: User | null; gyms: Gym[]; setBookings: any; categoryFilter?: 'gym' | 'camp' }> = ({ user, gyms, setBookings, categoryFilter }) => {
+const HomePage: React.FC<{
+  user: User | null;
+  gyms: Gym[];
+  setBookings: any;
+  categoryFilter?: 'gym' | 'camp';
+  heroImages?: string[];
+  currentHeroIndex?: number;
+}> = ({ user, gyms, setBookings, categoryFilter, heroImages = [], currentHeroIndex = 0 }) => {
   const navigate = useNavigate();
   const [announcements, setAnnouncements] = useState<any[]>([]);
 
@@ -138,146 +145,169 @@ const HomePage: React.FC<{ user: User | null; gyms: Gym[]; setBookings: any; cat
   });
 
   return (
-    <div className="max-w-[1440px] mx-auto px-4 sm:px-10 pb-20">
-      {/* Hero */}
-      <div className="pt-32 lg:pt-44 pb-16 grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr] gap-10 items-end">
-        <div>
-          <Mono className="text-brand-red block mb-6">Bangkok • Phuket • Chiang Mai</Mono>
-          <h1 className="text-[clamp(3.5rem,8vw,8rem)] font-black text-brand-charcoal leading-[0.9] tracking-tight">
-            {categoryFilter === 'gym' ? 'ELITE GYMS' : categoryFilter === 'camp' ? 'AUTHENTIC CAMPS' : 'FORGE YOUR'}<br />
-            <span className="text-brand-red">{categoryFilter ? 'SELECTION' : 'LEGACY.'}</span>
-          </h1>
-          <div className="flex flex-col sm:flex-row gap-4 mt-8">
-            <button className="bg-brand-red text-white font-black uppercase text-lg px-8 py-4 hover:bg-brand-charcoal transition-colors whitespace-nowrap" onClick={() => {
-              const element = document.getElementById('gyms');
-              if (element) element.scrollIntoView({ behavior: 'smooth' });
-            }}>
-              BOOK YOUR TRAINING NOW
-            </button>
-            <button className="bg-brand-blue text-white font-black uppercase text-lg px-8 py-4 hover:bg-brand-charcoal transition-colors whitespace-nowrap" onClick={() => {
-              const element = document.getElementById('gyms');
-              if (element) element.scrollIntoView({ behavior: 'smooth' });
-            }}>
-              EXPLORE GYMS
-            </button>
-          </div>
-          <div className="mt-4 font-mono text-xs text-brand-charcoal opacity-70 flex items-center gap-2 flex-wrap">
-            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-            Verified Gyms | Secure Stripe Payment | Instant Confirmation
-          </div>
-        </div>
-        <div className="font-mono text-sm leading-relaxed border-l-2 border-brand-blue pl-8 text-brand-charcoal opacity-80 mb-4 lg:mb-0">
-          The world's most curated platform for authentic Muay Thai training.
-          From backyard rings to world-class stadiums.
-        </div>
-      </div>
-
-      {/* News Ticker / Announcements */}
-      {announcements.length > 0 && (
-        <div className="mb-12 bg-brand-charcoal text-white p-6 border-l-4 border-brand-red animate-reveal shadow-[8px_8px_0px_0px_#AE3A17]">
-          <h3 className="font-black uppercase tracking-widest text-sm mb-4 text-brand-red flex items-center gap-2">
-            <span className="w-2 h-2 bg-brand-red rounded-full animate-pulse"></span>
-            Ring Side News
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {announcements.slice(0, 3).map((news: any) => (
-              <div key={news.id} className="border border-gray-700 p-4 bg-white/5 hover:bg-white/10 transition-colors">
-                <div className="font-bold uppercase text-lg mb-2 text-white">{news.title}</div>
-                <p className="font-mono text-xs text-gray-400 leading-relaxed mb-3">
-                  {news.content}
-                </p>
-                <div className="text-[10px] font-mono text-brand-blue uppercase">{new Date(news.createdAt).toLocaleDateString()}</div>
-              </div>
-            ))}
-          </div>
+    <div className="relative pb-20">
+      {/* Dynamic Carousel Background */}
+      {heroImages.length > 0 && (
+        <div className="absolute top-0 left-0 w-full h-[90vh] md:h-[80vh] overflow-hidden -z-10 bg-brand-charcoal">
+          {heroImages.map((src, idx) => (
+            <div
+              key={src}
+              className="absolute inset-0 transition-opacity duration-1000 ease-in-out"
+              style={{ opacity: currentHeroIndex === idx ? 1 : 0 }}
+            >
+              <img
+                src={src}
+                alt={`Hero image ${idx + 1}`}
+                className="w-full h-full object-cover scale-105"
+              />
+              {/* Overlay for text legibility (matches the white theme of the site) */}
+              <div className="absolute inset-0 bg-gradient-to-r from-white via-white/80 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-white via-white/20 to-transparent" />
+            </div>
+          ))}
         </div>
       )}
 
-      {/* Booking Bar Component */}
-      <div className="bg-white border-2 border-brand-charcoal grid grid-cols-1 md:grid-cols-[1fr_1fr_1fr_auto] shadow-[12px_12px_0px_0px_#3471AE]">
-        <BlockInput
-          label="Location / Name"
-          placeholder="Where do you fight?"
-          value={locationInput}
-          onChange={(e: any) => setLocationInput(e.target.value)}
-        />
-        <BlockInput
-          label="Discipline"
-          placeholder="Muay Thai / Boxing"
-          value={disciplineInput}
-          onChange={(e: any) => setDisciplineInput(e.target.value)}
-        />
-        <div className="p-6 border-b md:border-r border-brand-charcoal md:border-gray-200 bg-gray-50 flex flex-col justify-center">
-          <label className="block font-mono text-xs text-brand-blue font-bold mb-2 uppercase">RESULTS</label>
-          <div className="font-black text-xl">{filteredGyms.length} GYMS FOUND</div>
-        </div>
-        <button
-          className="bg-brand-red text-white font-black uppercase text-lg px-10 py-6 md:py-0 hover:bg-brand-charcoal transition-colors h-full"
-          onClick={() => {
-            const element = document.getElementById('gyms');
-            if (element) element.scrollIntoView({ behavior: 'smooth' });
-          }}
-        >
-          Search
-        </button>
-      </div>
-
-      {/* How It Works Section */}
-      <div className="py-24 border-t-2 border-brand-charcoal/10 mt-20">
-        <div className="mb-12 text-center">
-          <Mono className="text-brand-blue mb-4">The Process</Mono>
-          <h2 className="text-4xl font-black uppercase text-brand-charcoal">How ThaiKicks Works</h2>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
-          <div className="hidden md:block absolute top-12 left-[10%] right-[10%] h-1 bg-brand-charcoal/10 -z-10"></div>
-
-          <div className="bg-white border-2 border-brand-charcoal p-8 flex flex-col items-center text-center shadow-[6px_6px_0px_#1A1A1A] relative z-10 transition-transform hover:-translate-y-1">
-            <div className="w-16 h-16 bg-brand-charcoal text-white rounded-full flex items-center justify-center font-black text-2xl mb-6 shadow-sm">1</div>
-            <h3 className="font-black text-xl uppercase mb-3 text-brand-charcoal">Choose Your Gym</h3>
-            <p className="font-mono text-xs text-gray-500 leading-relaxed">Filter by location, discipline, and vibe. From gritty professional camps to modern fitness facilities.</p>
+      <div className="max-w-[1440px] mx-auto px-4 sm:px-10 relative z-10">
+        {/* Hero */}
+        <div className="pt-32 lg:pt-44 pb-16 grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr] gap-10 items-end">
+          <div>
+            <Mono className="text-brand-red block mb-6">Bangkok • Phuket • Chiang Mai</Mono>
+            <h1 className="text-[clamp(3.5rem,8vw,8rem)] font-black text-brand-charcoal leading-[0.9] tracking-tight">
+              {categoryFilter === 'gym' ? 'ELITE GYMS' : categoryFilter === 'camp' ? 'AUTHENTIC CAMPS' : 'FORGE YOUR'}<br />
+              <span className="text-brand-red">{categoryFilter ? 'SELECTION' : 'LEGACY.'}</span>
+            </h1>
+            <div className="flex flex-col sm:flex-row gap-4 mt-8">
+              <button className="bg-brand-red text-white font-black uppercase text-lg px-8 py-4 hover:bg-brand-charcoal transition-colors whitespace-nowrap" onClick={() => {
+                const element = document.getElementById('gyms');
+                if (element) element.scrollIntoView({ behavior: 'smooth' });
+              }}>
+                BOOK YOUR TRAINING NOW
+              </button>
+              <button className="bg-brand-blue text-white font-black uppercase text-lg px-8 py-4 hover:bg-brand-charcoal transition-colors whitespace-nowrap" onClick={() => {
+                const element = document.getElementById('gyms');
+                if (element) element.scrollIntoView({ behavior: 'smooth' });
+              }}>
+                EXPLORE GYMS
+              </button>
+            </div>
+            <div className="mt-4 font-mono text-xs text-brand-charcoal opacity-70 flex items-center gap-2 flex-wrap">
+              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+              Verified Gyms | Secure Stripe Payment | Instant Confirmation
+            </div>
           </div>
-
-          <div className="bg-white border-2 border-brand-charcoal p-8 flex flex-col items-center text-center shadow-[6px_6px_0px_#1A1A1A] relative z-10 transition-transform hover:-translate-y-1">
-            <div className="w-16 h-16 bg-brand-red text-white rounded-full flex items-center justify-center font-black text-2xl mb-6 shadow-sm">2</div>
-            <h3 className="font-black text-xl uppercase mb-3 text-brand-charcoal">Select Your Date</h3>
-            <p className="font-mono text-xs text-gray-500 leading-relaxed">Book your session instantly through our secure gateway. Lock in spots at high-demand camps.</p>
-          </div>
-
-          <div className="bg-white border-2 border-brand-charcoal p-8 flex flex-col items-center text-center shadow-[6px_6px_0px_#1A1A1A] relative z-10 transition-transform hover:-translate-y-1">
-            <div className="w-16 h-16 bg-brand-blue text-white rounded-full flex items-center justify-center font-black text-2xl mb-6 shadow-sm">3</div>
-            <h3 className="font-black text-xl uppercase mb-3 text-brand-charcoal">Train Like A Fighter</h3>
-            <p className="font-mono text-xs text-gray-500 leading-relaxed">Receive your instant confirmation barcode. Show up, wrap your hands, and forge your legacy.</p>
+          <div className="font-mono text-sm leading-relaxed border-l-2 border-brand-blue pl-8 text-brand-charcoal opacity-80 mb-4 lg:mb-0">
+            The world's most curated platform for authentic Muay Thai training.
+            From backyard rings to world-class stadiums.
           </div>
         </div>
-      </div>
 
-      {/* Grid */}
-      <div id="gyms" className="pt-24 pb-12 grid grid-cols-12 gap-y-12 md:gap-x-10">
-
-        {/* Dynamic Cards */}
-        {filteredGyms.length > 0 ? (
-          filteredGyms.map((gym, index) => (
-            <React.Fragment key={gym.id}>
-              <GymCard gym={gym} onBook={() => handleBookClick(gym)} isLarge={index === 0} />
-              {/* Insert Canvas Block after first item */}
-              {index === 0 && (
-                <div className="col-span-12 md:col-span-6 bg-brand-blue text-white p-12 flex flex-col justify-center animate-reveal" style={{ animationDelay: '0.2s' }}>
-                  <Mono className="text-brand-bone mb-4">Tradition</Mono>
-                  <h2 className="text-5xl font-black mb-6 uppercase text-brand-red">The Art of Eight Limbs</h2>
-                  <p className="opacity-90 leading-relaxed max-w-md mb-8">
-                    Booking a gym shouldn't be a fight. We connect practitioners with verified camps that respect the lineage of the sport.
+        {/* News Ticker / Announcements */}
+        {announcements.length > 0 && (
+          <div className="mb-12 bg-brand-charcoal text-white p-6 border-l-4 border-brand-red animate-reveal shadow-[8px_8px_0px_0px_#AE3A17]">
+            <h3 className="font-black uppercase tracking-widest text-sm mb-4 text-brand-red flex items-center gap-2">
+              <span className="w-2 h-2 bg-brand-red rounded-full animate-pulse"></span>
+              Ring Side News
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {announcements.slice(0, 3).map((news: any) => (
+                <div key={news.id} className="border border-gray-700 p-4 bg-white/5 hover:bg-white/10 transition-colors">
+                  <div className="font-bold uppercase text-lg mb-2 text-white">{news.title}</div>
+                  <p className="font-mono text-xs text-gray-400 leading-relaxed mb-3">
+                    {news.content}
                   </p>
-                  <a href="#" className="font-mono underline text-sm uppercase">Read Heritage Guide</a>
+                  <div className="text-[10px] font-mono text-brand-blue uppercase">{new Date(news.createdAt).toLocaleDateString()}</div>
                 </div>
-              )}
-            </React.Fragment>
-          ))
-        ) : (
-          <div className="col-span-12 text-center py-20 font-mono text-gray-400 border-2 border-dashed border-gray-300">
-            NO GYMS FOUND MATCHING YOUR CRITERIA
+              ))}
+            </div>
           </div>
         )}
 
+        {/* Booking Bar Component */}
+        <div className="bg-white border-2 border-brand-charcoal grid grid-cols-1 md:grid-cols-[1fr_1fr_1fr_auto] shadow-[12px_12px_0px_0px_#3471AE]">
+          <BlockInput
+            label="Location / Name"
+            placeholder="Where do you fight?"
+            value={locationInput}
+            onChange={(e: any) => setLocationInput(e.target.value)}
+          />
+          <BlockInput
+            label="Discipline"
+            placeholder="Muay Thai / Boxing"
+            value={disciplineInput}
+            onChange={(e: any) => setDisciplineInput(e.target.value)}
+          />
+          <div className="p-6 border-b md:border-r border-brand-charcoal md:border-gray-200 bg-gray-50 flex flex-col justify-center">
+            <label className="block font-mono text-xs text-brand-blue font-bold mb-2 uppercase">RESULTS</label>
+            <div className="font-black text-xl">{filteredGyms.length} GYMS FOUND</div>
+          </div>
+          <button
+            className="bg-brand-red text-white font-black uppercase text-lg px-10 py-6 md:py-0 hover:bg-brand-charcoal transition-colors h-full"
+            onClick={() => {
+              const element = document.getElementById('gyms');
+              if (element) element.scrollIntoView({ behavior: 'smooth' });
+            }}
+          >
+            Search
+          </button>
+        </div>
+
+        {/* How It Works Section */}
+        <div className="py-24 border-t-2 border-brand-charcoal/10 mt-20">
+          <div className="mb-12 text-center">
+            <Mono className="text-brand-blue mb-4">The Process</Mono>
+            <h2 className="text-4xl font-black uppercase text-brand-charcoal">How ThaiKicks Works</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
+            <div className="hidden md:block absolute top-12 left-[10%] right-[10%] h-1 bg-brand-charcoal/10 -z-10"></div>
+
+            <div className="bg-white border-2 border-brand-charcoal p-8 flex flex-col items-center text-center shadow-[6px_6px_0px_#1A1A1A] relative z-10 transition-transform hover:-translate-y-1">
+              <div className="w-16 h-16 bg-brand-charcoal text-white rounded-full flex items-center justify-center font-black text-2xl mb-6 shadow-sm">1</div>
+              <h3 className="font-black text-xl uppercase mb-3 text-brand-charcoal">Choose Your Gym</h3>
+              <p className="font-mono text-xs text-gray-500 leading-relaxed">Filter by location, discipline, and vibe. From gritty professional camps to modern fitness facilities.</p>
+            </div>
+
+            <div className="bg-white border-2 border-brand-charcoal p-8 flex flex-col items-center text-center shadow-[6px_6px_0px_#1A1A1A] relative z-10 transition-transform hover:-translate-y-1">
+              <div className="w-16 h-16 bg-brand-red text-white rounded-full flex items-center justify-center font-black text-2xl mb-6 shadow-sm">2</div>
+              <h3 className="font-black text-xl uppercase mb-3 text-brand-charcoal">Select Your Date</h3>
+              <p className="font-mono text-xs text-gray-500 leading-relaxed">Book your session instantly through our secure gateway. Lock in spots at high-demand camps.</p>
+            </div>
+
+            <div className="bg-white border-2 border-brand-charcoal p-8 flex flex-col items-center text-center shadow-[6px_6px_0px_#1A1A1A] relative z-10 transition-transform hover:-translate-y-1">
+              <div className="w-16 h-16 bg-brand-blue text-white rounded-full flex items-center justify-center font-black text-2xl mb-6 shadow-sm">3</div>
+              <h3 className="font-black text-xl uppercase mb-3 text-brand-charcoal">Train Like A Fighter</h3>
+              <p className="font-mono text-xs text-gray-500 leading-relaxed">Receive your instant confirmation barcode. Show up, wrap your hands, and forge your legacy.</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Grid */}
+        <div id="gyms" className="pt-24 pb-12 grid grid-cols-12 gap-y-12 md:gap-x-10">
+
+          {/* Dynamic Cards */}
+          {filteredGyms.length > 0 ? (
+            filteredGyms.map((gym, index) => (
+              <React.Fragment key={gym.id}>
+                <GymCard gym={gym} onBook={() => handleBookClick(gym)} isLarge={index === 0} />
+                {/* Insert Canvas Block after first item */}
+                {index === 0 && (
+                  <div className="col-span-12 md:col-span-6 bg-brand-blue text-white p-12 flex flex-col justify-center animate-reveal" style={{ animationDelay: '0.2s' }}>
+                    <Mono className="text-brand-bone mb-4">Tradition</Mono>
+                    <h2 className="text-5xl font-black mb-6 uppercase text-brand-red">The Art of Eight Limbs</h2>
+                    <p className="opacity-90 leading-relaxed max-w-md mb-8">
+                      Booking a gym shouldn't be a fight. We connect practitioners with verified camps that respect the lineage of the sport.
+                    </p>
+                    <a href="#" className="font-mono underline text-sm uppercase">Read Heritage Guide</a>
+                  </div>
+                )}
+              </React.Fragment>
+            ))
+          ) : (
+            <div className="col-span-12 text-center py-20 font-mono text-gray-400 border-2 border-dashed border-gray-300">
+              NO GYMS FOUND MATCHING YOUR CRITERIA
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -1014,14 +1044,14 @@ const App: React.FC = () => {
 
         <main className="flex-1">
           <Routes>
-            <Route path="/" element={<HomePage user={activeUser} gyms={gyms} setBookings={setBookings} />} />
-            <Route path="/gyms" element={<HomePage user={activeUser} gyms={gyms} setBookings={setBookings} categoryFilter="gym" />} />
-            <Route path="/camps" element={<HomePage user={activeUser} gyms={gyms} setBookings={setBookings} categoryFilter="camp" />} />
+            <Route path="/" element={<HomePage user={activeUser} gyms={gyms} setBookings={setBookings} heroImages={heroImages} currentHeroIndex={currentHeroIndex} />} />
+            <Route path="/gyms" element={<HomePage user={activeUser} gyms={gyms} setBookings={setBookings} categoryFilter="gym" heroImages={heroImages} currentHeroIndex={currentHeroIndex} />} />
+            <Route path="/camps" element={<HomePage user={activeUser} gyms={gyms} setBookings={setBookings} categoryFilter="camp" heroImages={heroImages} currentHeroIndex={currentHeroIndex} />} />
             <Route path="/booking/:gymId" element={<BookingPage gyms={gyms} user={activeUser} setBookings={setBookings} />} />
-            <Route path="/dashboard" element={activeUser?.role === 'customer' ? <CustomerDashboard user={activeUser} bookings={bookings} requestAffiliate={handleAffiliateRequest} /> : <HomePage user={activeUser} gyms={gyms} setBookings={setBookings} />} />
-            <Route path="/owner" element={activeUser?.role === 'owner' ? <OwnerDashboard user={activeUser} gyms={gyms} updateGym={handleUpdateGym} bookings={bookings} /> : <HomePage user={activeUser} gyms={gyms} setBookings={setBookings} />} />
-            <Route path="/admin" element={activeUser?.role === 'admin' ? <AdminDashboard bookings={bookings} applications={applications} handleApprove={handleAffiliateApproval} /> : <HomePage user={activeUser} gyms={gyms} setBookings={setBookings} />} />
-            <Route path="/analytics" element={(activeUser?.role === 'admin' || activeUser?.role === 'owner') ? <AnalyticsDashboard bookings={bookings} /> : <HomePage user={activeUser} gyms={gyms} setBookings={setBookings} />} />
+            <Route path="/dashboard" element={activeUser?.role === 'customer' ? <CustomerDashboard user={activeUser} bookings={bookings} requestAffiliate={handleAffiliateRequest} /> : <HomePage user={activeUser} gyms={gyms} setBookings={setBookings} heroImages={heroImages} currentHeroIndex={currentHeroIndex} />} />
+            <Route path="/owner" element={activeUser?.role === 'owner' ? <OwnerDashboard user={activeUser} gyms={gyms} updateGym={handleUpdateGym} bookings={bookings} /> : <HomePage user={activeUser} gyms={gyms} setBookings={setBookings} heroImages={heroImages} currentHeroIndex={currentHeroIndex} />} />
+            <Route path="/admin" element={activeUser?.role === 'admin' ? <AdminDashboard bookings={bookings} applications={applications} handleApprove={handleAffiliateApproval} /> : <HomePage user={activeUser} gyms={gyms} setBookings={setBookings} heroImages={heroImages} currentHeroIndex={currentHeroIndex} />} />
+            <Route path="/analytics" element={(activeUser?.role === 'admin' || activeUser?.role === 'owner') ? <AnalyticsDashboard bookings={bookings} /> : <HomePage user={activeUser} gyms={gyms} setBookings={setBookings} heroImages={heroImages} currentHeroIndex={currentHeroIndex} />} />
             <Route path="/shop" element={<ShopPage user={activeUser} />} />
             <Route path="/tickets" element={<TicketingPage user={activeUser} />} />
             <Route path="/checkout" element={<CheckoutPage user={activeUser} />} />

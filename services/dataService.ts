@@ -547,12 +547,29 @@ export const getSystemSetting = async (key: string): Promise<string | null> => {
 };
 
 export const updateSystemSetting = async (key: string, value: string) => {
-    const { error } = await supabase
+    // Check if the setting exists first
+    const { data: existing, error: checkError } = await supabase
         .from('system_settings')
-        .update({ value })
-        .eq('key', key);
+        .select('id')
+        .eq('key', key)
+        .maybeSingle();
 
-    if (error) throw error;
+    if (checkError) {
+        console.warn(`Error checking setting ${key}:`, checkError);
+    }
+
+    if (existing) {
+        const { error } = await supabase
+            .from('system_settings')
+            .update({ value })
+            .eq('key', key);
+        if (error) throw error;
+    } else {
+        const { error } = await supabase
+            .from('system_settings')
+            .insert({ key, value });
+        if (error) throw error;
+    }
 };
 
 export const validateAffiliateCode = async (code: string): Promise<boolean> => {
