@@ -293,7 +293,7 @@ const HomePage: React.FC<{
                 {index === 0 && (
                   <div className="col-span-12 md:col-span-6 bg-brand-blue text-white p-12 flex flex-col justify-center animate-reveal" style={{ animationDelay: '0.2s' }}>
                     <Mono className="text-brand-bone mb-4">Tradition</Mono>
-                    <h2 className="text-5xl font-black mb-6 uppercase text-brand-red">The Art of Eight Limbs</h2>
+                    <h2 className="text-5xl font-black mb-6 uppercase text-white">The Art of Eight Limbs</h2>
                     <p className="opacity-90 leading-relaxed max-w-md mb-8">
                       Booking a gym shouldn't be a fight. We connect practitioners with verified camps that respect the lineage of the sport.
                     </p>
@@ -1087,7 +1087,7 @@ const App: React.FC = () => {
           <div className="max-w-[1440px] mx-auto px-4 sm:px-10 grid grid-cols-1 md:grid-cols-4 gap-12">
             <div className="md:col-span-2">
               <Link to="/" className="flex items-center gap-1 mb-6">
-                <img src="/tk-logo.png" alt="Thaikick" className="h-10 w-auto object-contain" />
+                <img src="/tk-logo-white.png" alt="Thaikick" className="h-10 w-auto object-contain" />
               </Link>
               <p className="font-mono text-sm opacity-50 max-w-xs leading-relaxed">
                 Standardizing the Muay Thai experience for the global community.
