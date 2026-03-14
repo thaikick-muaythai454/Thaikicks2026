@@ -1,5 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Shield, Check, X, Users, DollarSign, Activity, Megaphone, Trash2, Edit, Plus, UserPlus, Calendar, Clock, BookOpen, Layers, ShoppingBag, Package } from 'lucide-react';
 import { USERS } from '../lib/auth-data';
 import { Booking, AffiliateApplication, Announcement, Gym, Trainer, TrainerSchedule, User, Course, Product } from '../lib/types';
@@ -9,6 +9,8 @@ import ProductManagement from './ProductManagement';
 import EventManagement from './EventManagement';
 
 interface AdminDashboardProps {
+  gyms: Gym[];
+  setGyms: (gyms: Gym[]) => void;
   bookings: Booking[];
   applications?: AffiliateApplication[];
   handleApprove?: (id: string, ok: boolean) => void;
@@ -50,7 +52,8 @@ const DashboardContainer: React.FC<{ title: string; subtitle: string; children: 
   </div>
 );
 
-const AdminDashboard: React.FC<AdminDashboardProps> = ({ bookings }) => {
+const AdminDashboard: React.FC<AdminDashboardProps> = ({ gyms, setGyms, bookings }) => {
+  const navigate = useNavigate();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [applications, setApplications] = useState<AffiliateApplication[]>([]);
@@ -58,7 +61,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ bookings }) => {
   const [newsContent, setNewsContent] = useState("");
   const [isPosting, setIsPosting] = useState(false);
 
-  const [gyms, setGyms] = useState<Gym[]>([]);
+  // const [gyms, setGyms] = useState<Gym[]>([]); // Removed: Using prop from App.tsx instead
   const [editingGym, setEditingGym] = useState<Partial<Gym> | null>(null);
   const [isGymFormOpen, setIsGymFormOpen] = useState(false);
 
@@ -93,7 +96,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ bookings }) => {
   const [isUploadingHero, setIsUploadingHero] = useState(false);
 
   // Tabs
-  const [activeTab, setActiveTab] = useState<'overview' | 'gyms' | 'users' | 'announcements' | 'bookings' | 'courses' | 'shop' | 'appearance' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'gyms' | 'announcements' | 'bookings' | 'courses' | 'shop' | 'appearance' | 'settings'>('overview');
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -177,33 +180,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ bookings }) => {
     }
   };
 
-  const addModuleToCourse = () => {
-    const currentModules = editingCourse.designData?.modules || [];
-    const newModule = { title: "New Module", content: "" };
-    setEditingCourse({
-      ...editingCourse,
-      designData: { ...editingCourse.designData, modules: [...currentModules, newModule] }
-    });
-  };
-
-  const updateModule = (index: number, field: string, value: string) => {
-    const modules = [...(editingCourse.designData?.modules || [])];
-    modules[index] = { ...modules[index], [field]: value };
-    setEditingCourse({
-      ...editingCourse,
-      designData: { ...editingCourse.designData, modules }
-    });
-  };
-
-  const removeModule = (index: number) => {
-    const modules = [...(editingCourse.designData?.modules || [])];
-    modules.splice(index, 1);
-    setEditingCourse({
-      ...editingCourse,
-      designData: { ...editingCourse.designData, modules }
-    });
-  };
-
   const loadUsers = async () => {
     const data = await getAllUsers();
     setUsers(data);
@@ -227,9 +203,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ bookings }) => {
       setIsGymFormOpen(false);
       setEditingGym(null);
       await loadGyms();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert("Failed to save gym. Please check your connection and try again.");
+      alert("Failed to save gym: " + (err.message || String(err)));
     }
   };
 
@@ -249,15 +225,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ bookings }) => {
     try {
       await createTrainer({ ...newTrainer, gymId: editingGym.id });
       setNewTrainer({ name: '', specialty: '', pricePerSession: 500, image: '' }); // Reset
-      // Refresh Gyms to show new trainer (since fetching gyms also fetches trainers)
-      await loadGyms();
-      // Also update local editingGym state if we want to show it immediately without re-opening?
-      // Actually loadGyms updates 'gyms', but we need to update the object currently being edited to reflect changes if strictly checking local state.
-      // But typically we re-fetch. Let's just re-fetch and find the gym again to update editingGym view if needed.
       const updatedGyms = await getGyms();
       const currentGym = updatedGyms.find(g => g.id === editingGym.id);
       if (currentGym) setEditingGym(currentGym);
-
     } catch (err) {
       console.error(err);
       alert("Failed to add trainer");
@@ -269,7 +239,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ bookings }) => {
     try {
       await deleteTrainer(trainerId);
       await loadGyms();
-      // Refresh local editing state
       const updatedGyms = await getGyms();
       if (editingGym?.id) {
         const currentGym = updatedGyms.find(g => g.id === editingGym.id);
@@ -295,7 +264,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ bookings }) => {
         startTime: newSchedule.start,
         endTime: newSchedule.end
       });
-      // Reload
       const schedules = await getTrainerSchedules(managingScheduleFor.id);
       setTrainerSchedules(schedules);
     } catch (err) {
@@ -328,7 +296,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ bookings }) => {
     }
   };
 
-  const loadAnnouncements = async () => { // Rename legacy loadNews
+  const loadAnnouncements = async () => {
     const data = await getAnnouncements();
     setAnnouncements(data);
   };
@@ -359,21 +327,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ bookings }) => {
     }
   };
 
-
-  const handleRoleChange = async (userId: string, newRole: string) => {
-    if (!confirm(`Are you sure you want to change this user's role to ${newRole}?`)) return;
-    try {
-      await updateUserRole(userId, newRole);
-      // Refresh users list
-      const updatedUsers = await getAllUsers();
-      setUsers(updatedUsers);
-    } catch (err) {
-      console.error(err);
-      alert("Failed to update role");
-    }
-  };
-
-  // --- Product Management Functions ---
   const loadProducts = async () => {
     const data = await getProducts();
     setProducts(data);
@@ -409,7 +362,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ bookings }) => {
     }
   };
 
-  // --- Appearance Management ---
   const handleHeroFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -428,7 +380,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ bookings }) => {
       alert("Failed to upload hero image: " + (err.message || String(err)));
     } finally {
       setIsUploadingHero(false);
-      // Reset the file input so the same file could be selected again if needed
       e.target.value = '';
     }
   };
@@ -446,13 +397,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ bookings }) => {
     }
   };
 
-  // ── Analytics State ──────────────────────────────────────────
   const [filterDateFrom, setFilterDateFrom] = React.useState('');
   const [filterDateTo, setFilterDateTo] = React.useState('');
   const [filterGymId, setFilterGymId] = React.useState('all');
   const [filterStatus, setFilterStatus] = React.useState('all');
 
-  // Filtered bookings for analytics
   const filteredBookings = bookings.filter(b => {
     const matchFrom = !filterDateFrom || b.date >= filterDateFrom;
     const matchTo = !filterDateTo || b.date <= filterDateTo;
@@ -466,7 +415,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ bookings }) => {
   const totalNet = totalRevenue - totalCommission;
 
   type GymPerf = { name: string; bookings: number; revenue: number; commission: number };
-  // Gym performance map
   const gymPerformance = filteredBookings.reduce((acc: Record<string, GymPerf>, b) => {
     if (!acc[b.gymId]) acc[b.gymId] = { name: b.gymName, bookings: 0, revenue: 0, commission: 0 };
     acc[b.gymId].bookings += 1;
@@ -476,7 +424,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ bookings }) => {
   }, {} as Record<string, GymPerf>);
   const gymPerfList: GymPerf[] = (Object.values(gymPerformance) as GymPerf[]).sort((a, b) => b.revenue - a.revenue);
 
-  // CSV Export
   const handleExportCSV = () => {
     const rows: string[] = [];
     rows.push(['Booking ID', 'Date', 'Type', 'Status', 'Gym Name', 'User Name', 'Trainer', 'Total (฿)', 'Commission (฿)', 'Net (฿)'].join(','));
@@ -494,7 +441,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ bookings }) => {
         b.totalPrice - (b.commissionAmount || 0)
       ].join(','));
     });
-    // Summary rows
     rows.push('');
     rows.push(['SUMMARY', '', '', '', '', '', '', '', '', ''].join(','));
     rows.push(['Total Revenue', '', '', '', '', '', '', totalRevenue, '', ''].join(','));
@@ -512,18 +458,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ bookings }) => {
     URL.revokeObjectURL(url);
   };
 
-  // Filter Bookings for Attendance
-  const attendanceList = bookings.filter(b => {
-    const matchDate = !attendanceDate || b.date === attendanceDate;
-    const matchGym = attendanceGymId === 'all' || b.gymId === attendanceGymId;
-    const isPaid = b.status === 'confirmed' || b.status === 'completed';
-    return matchDate && matchGym && isPaid;
-  });
-
-
   return (
     <div className="max-w-[1440px] mx-auto px-4 sm:px-10 py-12 animate-reveal min-h-[80vh]">
-      {/* Header */}
       <div className="mb-12 border-b-2 border-brand-charcoal pb-6 flex flex-col md:flex-row justify-between md:items-end gap-4">
         <div>
           <Mono className="text-brand-blue">System Administration</Mono>
@@ -535,9 +471,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ bookings }) => {
         </div>
       </div>
 
-      {/* ── Analytics Report Panel ─────────────────────────────── */}
       <div className="mb-12 border-2 border-brand-charcoal bg-white shadow-[8px_8px_0px_0px_#1A1A1A]">
-        {/* Panel Header */}
         <div className="p-5 border-b-2 border-brand-charcoal bg-brand-bone flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="flex items-center gap-3">
             <Activity className="w-5 h-5 text-brand-red animate-pulse" />
@@ -554,30 +488,25 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ bookings }) => {
           </button>
         </div>
 
-        {/* Filters */}
         <div className="p-5 border-b border-gray-100 bg-gray-50 grid grid-cols-2 md:grid-cols-4 gap-3">
           <div>
             <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">From Date</label>
-            <input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)}
-              className="w-full border border-gray-200 p-2 font-mono text-xs" />
+            <input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} className="w-full border border-gray-200 p-2 font-mono text-xs" />
           </div>
           <div>
             <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">To Date</label>
-            <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)}
-              className="w-full border border-gray-200 p-2 font-mono text-xs" />
+            <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} className="w-full border border-gray-200 p-2 font-mono text-xs" />
           </div>
           <div>
             <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Gym</label>
-            <select value={filterGymId} onChange={e => setFilterGymId(e.target.value)}
-              className="w-full border border-gray-200 p-2 font-mono text-xs bg-white">
+            <select value={filterGymId} onChange={e => setFilterGymId(e.target.value)} className="w-full border border-gray-200 p-2 font-mono text-xs bg-white">
               <option value="all">All Gyms</option>
               {gyms.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
             </select>
           </div>
           <div>
             <label className="block text-[10px] font-mono uppercase text-gray-400 mb-1">Status</label>
-            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-              className="w-full border border-gray-200 p-2 font-mono text-xs bg-white">
+            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="w-full border border-gray-200 p-2 font-mono text-xs bg-white">
               <option value="all">All Statuses</option>
               <option value="confirmed">Confirmed</option>
               <option value="completed">Completed</option>
@@ -587,7 +516,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ bookings }) => {
           </div>
         </div>
 
-        {/* KPI Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 divide-x-2 divide-y-2 md:divide-y-0 divide-brand-charcoal/10 border-b border-gray-100">
           <div className="p-5">
             <Mono className="text-gray-400">Total Bookings</Mono>
@@ -607,7 +535,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ bookings }) => {
           </div>
         </div>
 
-        {/* Gym Performance Table */}
         <div className="p-5">
           <div className="font-mono text-xs uppercase font-bold text-gray-400 mb-3">Gym Performance</div>
           {gymPerfList.length === 0 ? (
@@ -631,623 +558,282 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ bookings }) => {
           )}
         </div>
       </div>
-      {/* Pending Affiliates Badge */}
-      {applications.length > 0 && (
-        <div className="mb-6 flex items-center gap-2 px-4 py-2 bg-brand-red text-white font-mono text-xs font-bold uppercase w-fit shadow-[4px_4px_0px_0px_#1A1A1A]">
-          <Activity className="w-3 h-3 animate-pulse" /> {applications.length} Pending Affiliate Request(s)
-        </div>
-      )}
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-12 pb-12">
-        {/* Left Column: Actions */}
-        <div className="space-y-12 min-w-0">
+      <div className="flex flex-col lg:flex-row gap-8">
+        <aside className="w-full lg:w-64 space-y-2">
+          <button onClick={() => setActiveTab('overview')} className={`w-full text-left px-4 py-3 font-mono text-xs font-bold uppercase transition-colors flex items-center gap-3 ${activeTab === 'overview' ? 'bg-brand-charcoal text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'}`}>
+            <Activity className="w-4 h-4" /> Overview
+          </button>
+          <button onClick={() => setActiveTab('gyms')} className={`w-full text-left px-4 py-3 font-mono text-xs font-bold uppercase transition-colors flex items-center gap-3 ${activeTab === 'gyms' ? 'bg-brand-charcoal text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'}`}>
+            <Layers className="w-4 h-4" /> Gym Inventory
+          </button>
+          <button onClick={() => setActiveTab('announcements')} className={`w-full text-left px-4 py-3 font-mono text-xs font-bold uppercase transition-colors flex items-center gap-3 ${activeTab === 'announcements' ? 'bg-brand-charcoal text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'}`}>
+            <Megaphone className="w-4 h-4" /> Broadcast News
+          </button>
+          <button onClick={() => navigate('/admin/users')} className="w-full text-left px-4 py-3 font-mono text-xs font-bold uppercase transition-colors flex items-center gap-3 bg-gray-50 text-gray-600 hover:bg-brand-red hover:text-white">
+            <Users className="w-4 h-4" /> User Management
+          </button>
+          <button onClick={() => setActiveTab('courses')} className={`w-full text-left px-4 py-3 font-mono text-xs font-bold uppercase transition-colors flex items-center gap-3 ${activeTab === 'courses' ? 'bg-brand-charcoal text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'}`}>
+            <BookOpen className="w-4 h-4" /> Courses
+          </button>
+          <button onClick={() => setActiveTab('shop')} className={`w-full text-left px-4 py-3 font-mono text-xs font-bold uppercase transition-colors flex items-center gap-3 ${activeTab === 'shop' ? 'bg-brand-charcoal text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'}`}>
+            <ShoppingBag className="w-4 h-4" /> Shop
+          </button>
+          <button onClick={() => setActiveTab('appearance')} className={`w-full text-left px-4 py-3 font-mono text-xs font-bold uppercase transition-colors flex items-center gap-3 ${activeTab === 'appearance' ? 'bg-brand-charcoal text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'}`}>
+            <Plus className="w-4 h-4" /> Appearance
+          </button>
+          <button onClick={() => setActiveTab('settings')} className={`w-full text-left px-4 py-3 font-mono text-xs font-bold uppercase transition-colors flex items-center gap-3 ${activeTab === 'settings' ? 'bg-brand-charcoal text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'}`}>
+            <Plus className="w-4 h-4" /> Settings
+          </button>
+        </aside>
 
-          {/* Ticketing Management (Moved to top for visibility) */}
-          <EventManagement />
-
-          {/* New Section: News Management */}
-          <BlockTable title="Broadcast News" icon={<Megaphone className="w-4 h-4" />}>
-            <div className="p-6 border-b-2 border-gray-100 bg-gray-50">
-              <input
-                className="w-full bg-white border border-gray-300 p-3 mb-2 font-mono text-sm"
-                placeholder="HEADLINE..."
-                value={newsTitle}
-                onChange={e => setNewsTitle(e.target.value)}
-              />
-              <textarea
-                className="w-full bg-white border border-gray-300 p-3 mb-4 font-mono text-sm h-20"
-                placeholder="Your announcement content..."
-                value={newsContent}
-                onChange={e => setNewsContent(e.target.value)}
-              ></textarea>
-              <button
-                onClick={handlePostNews}
-                disabled={isPosting}
-                className="w-full bg-brand-charcoal text-white font-bold uppercase py-3 hover:bg-brand-blue transition-colors disabled:opacity-50"
-              >
-                {isPosting ? 'Publishing...' : 'Publish Announcement'}
-              </button>
-            </div>
-
-            <div className="max-h-[300px] overflow-y-auto divide-y divide-gray-100">
-              {announcements.map(a => (
-                <div key={a.id} className="p-4 flex justify-between items-start hover:bg-brand-bone transition-colors group">
-                  <div>
-                    <div className="font-black uppercase text-sm">{a.title}</div>
-                    <p className="font-mono text-xs text-gray-500 truncate max-w-[200px]">{a.content}</p>
-                    <span className="text-[10px] text-gray-400">{new Date(a.createdAt).toLocaleDateString()}</span>
+        <div className="flex-1 min-w-0 space-y-8">
+          {activeTab === 'overview' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <EventManagement />
+              {applications.length > 0 && (
+                <BlockTable title="Affiliate Requests" icon={<UserPlus className="w-4 h-4" />}>
+                  <div className="p-4 space-y-4">
+                    {applications.map(app => (
+                      <div key={app.id} className="p-4 border border-gray-200 bg-gray-50">
+                        <div className="font-bold text-sm uppercase mb-1">{app.userName}</div>
+                        <p className="text-xs font-mono text-gray-500 mb-3">{app.reason}</p>
+                        <div className="flex gap-2">
+                          <button onClick={() => handleApprove(app.id, true)} className="bg-green-600 text-white px-3 py-1 text-[10px] font-bold uppercase">Approve</button>
+                          <button onClick={() => handleApprove(app.id, false)} className="bg-red-600 text-white px-3 py-1 text-[10px] font-bold uppercase">Reject</button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <button onClick={() => handleDeleteNews(a.id)} className="text-gray-300 hover:text-red-500 transition-colors">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
-              {announcements.length === 0 && <div className="p-4 text-center text-xs text-gray-400 font-mono">No active announcements</div>}
+                </BlockTable>
+              )}
             </div>
-          </BlockTable>
+          )}
 
-          {/* Gym Management */}
-          <BlockTable title="Gym Inventory" icon={<Activity className="w-4 h-4" />}>
-            <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-              <span className="font-mono text-xs text-gray-500">{gyms.length} Active Listings</span>
-              <button
-                onClick={() => { setEditingGym({}); setIsGymFormOpen(true); }}
-                className="bg-brand-charcoal text-white px-3 py-1 font-mono text-xs font-bold uppercase flex items-center gap-2 hover:bg-brand-blue"
-              >
-                <Plus className="w-3 h-3" /> Add Gym
-              </button>
-            </div>
-
-            {isGymFormOpen && (
-              <div className="p-6 bg-brand-bone border-b-2 border-brand-charcoal">
-                {managingScheduleFor ? (
-                  // --- SCHEDULE MANAGER MODE ---
-                  <div className="animate-reveal">
-                    <div className="flex justify-between items-center mb-4 border-b border-brand-charcoal pb-2">
-                      <h4 className="font-black uppercase text-sm">Manage Schedule: {managingScheduleFor.name}</h4>
-                      <button onClick={() => setManagingScheduleFor(null)} className="text-xs font-mono underline hover:text-brand-red">Close Schedule</button>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                      {/* List */}
-                      <div className="space-y-2">
-                        {trainerSchedules.length === 0 && <div className="text-xs text-gray-400 font-mono">No active slots.</div>}
-                        {trainerSchedules.map(s => (
-                          <div key={s.id} className="flex justify-between items-center bg-white p-2 border border-gray-200 shadow-sm">
-                            <div className="flex items-center gap-2">
-                              <div className="bg-brand-blue text-white text-[10px] font-bold px-2 py-1 w-20 text-center">{s.dayOfWeek}</div>
-                              <div className="font-mono text-xs">{s.startTime} - {s.endTime}</div>
-                            </div>
-                            <button onClick={() => handleDeleteSchedule(s.id)} className="text-gray-400 hover:text-red-500">
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* Add Form */}
-                      <div className="bg-gray-100 p-4 border border-gray-200">
-                        <div className="font-bold text-xs uppercase mb-3 text-gray-500">Add New Slot</div>
-                        <div className="space-y-3">
-                          <div>
-                            <label className="block text-[10px] uppercase font-bold mb-1">Day</label>
-                            <select
-                              className="w-full p-2 text-xs font-mono border"
-                              value={newSchedule.day}
-                              onChange={e => setNewSchedule({ ...newSchedule, day: e.target.value })}
-                            >
-                              {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(d => (
-                                <option key={d} value={d}>{d}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <label className="block text-[10px] uppercase font-bold mb-1">Start</label>
-                              <input type="time" className="w-full p-2 text-xs font-mono border" value={newSchedule.start} onChange={e => setNewSchedule({ ...newSchedule, start: e.target.value })} />
-                            </div>
-                            <div>
-                              <label className="block text-[10px] uppercase font-bold mb-1">End</label>
-                              <input type="time" className="w-full p-2 text-xs font-mono border" value={newSchedule.end} onChange={e => setNewSchedule({ ...newSchedule, end: e.target.value })} />
-                            </div>
-                          </div>
-                          <button onClick={handleAddSchedule} className="w-full bg-brand-charcoal text-white font-bold text-xs uppercase py-2 hover:bg-brand-blue transition-colors">
-                            Add Time Slot
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <form onSubmit={handleSaveGym} className="space-y-4">
-                    <div className="p-2 bg-gray-100 rounded mb-2 border border-gray-200">
-                      <h4 className="font-mono text-xs font-bold uppercase text-brand-charcoal mb-2 border-b border-gray-300 pb-1">Gym Info</h4>
-                      <div className="grid grid-cols-2 gap-4">
-                        <input
-                          className="border p-2 font-mono text-xs bg-white w-full"
-                          placeholder="Gym Name"
-                          value={editingGym?.name || ''}
-                          onChange={e => setEditingGym({ ...editingGym, name: e.target.value })}
-                          required
-                        />
-                        <select
-                          className="border p-2 font-mono text-xs bg-white w-full"
-                          value={editingGym?.category || 'gym'}
-                          onChange={e => setEditingGym({ ...editingGym, category: e.target.value as 'gym' | 'camp' })}
-                          required
-                        >
-                          <option value="gym">Gym</option>
-                          <option value="camp">Camp</option>
-                        </select>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4 mt-2">
-                        <div className="flex gap-2 items-center">
-                          {editingGym?.images?.[0] && <img src={editingGym.images[0]} className="w-10 h-10 object-cover border" alt="Preview" />}
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="border p-2 font-mono text-xs bg-white w-full file:mr-2 file:border-0 file:bg-brand-charcoal file:text-white file:text-xs file:px-2 file:cursor-pointer"
-                            onChange={async (e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                try {
-                                  e.target.disabled = true;
-                                  const { uploadImage } = await import('../services/dataService');
-                                  const url = await uploadImage('gyms', file);
-                                  if (url) setEditingGym({ ...editingGym, images: [url] });
-                                } catch (err) {
-                                  alert("Failed to upload image");
-                                } finally {
-                                  e.target.disabled = false;
-                                }
-                              }
-                            }}
-                          />
-                        </div>
-                        <input
-                          className="border p-2 font-mono text-xs bg-white w-full"
-                          placeholder="Location"
-                          value={editingGym?.location || ''}
-                          onChange={e => setEditingGym({ ...editingGym, location: e.target.value })}
-                          required
-                        />
-                        <input
-                          className="border p-2 font-mono text-xs bg-white w-full"
-                          placeholder="Base Price (THB)"
-                          type="number"
-                          value={editingGym?.basePrice ?? ''}
-                          onChange={e => setEditingGym({ ...editingGym, basePrice: Number(e.target.value) })}
-                          title="Price per session (Standard)"
-                          required
-                        />
-                        <input
-                          className="border p-2 font-mono text-xs bg-white w-full"
-                          placeholder="Affiliate Share % (e.g. 10)"
-                          type="number"
-                          value={editingGym?.affiliatePercentage ?? ''}
-                          onChange={e => setEditingGym({ ...editingGym, affiliatePercentage: Number(e.target.value) })}
-                          title="Percentage of revenue shared with affiliates"
-                        />
-
-                      </div>
-                      <textarea
-                        className="border p-2 font-mono text-xs bg-white w-full h-16 mt-2"
-                        placeholder="Description"
-                        value={editingGym?.description || ''}
-                        onChange={e => setEditingGym({ ...editingGym, description: e.target.value })}
-                      />
-                    </div>
-
-                    {/* Trainer Management Section (Only if editing existing gym) */}
-                    {editingGym?.id && (
-                      <div className="p-2 bg-white rounded border border-gray-200">
-                        <h4 className="font-mono text-xs font-bold uppercase text-brand-charcoal mb-2 border-b border-gray-100 pb-1 flex justify-between items-center">
-                          <span>Trainer Roster ({editingGym.trainers?.length || 0})</span>
-                          <span className="text-[10px] text-gray-400">Add below</span>
-                        </h4>
-
-                        {/* List Existing Trainers */}
-                        <div className="space-y-2 mb-4 max-h-[150px] overflow-y-auto">
-                          {editingGym.trainers?.map((t: Trainer) => (
-                            <div key={t.id} className="flex justify-between items-center bg-gray-50 p-2 text-xs font-mono">
-                              <div className="flex items-center gap-2">
-                                <div className="w-6 h-6 bg-gray-200 rounded-full overflow-hidden">
-                                  {t.image && <img src={t.image} className="w-full h-full object-cover" />}
-                                </div>
-                                <div>
-                                  <div className="font-bold">{t.name}</div>
-                                  <div className="text-[10px] text-gray-500">{t.specialty}</div>
-                                </div>
-                              </div>
-                              <button type="button" onClick={() => openScheduleManager(t)} className="text-brand-blue hover:text-brand-charcoal mr-2" title="Manage Schedule">
-                                <Calendar className="w-3 h-3" />
-                              </button>
-                              <button type="button" onClick={() => handleDeleteTrainer(t.id)} className="text-red-400 hover:text-red-600">
-                                <Trash2 className="w-3 h-3" />
-                              </button>
-                            </div>
-                          ))}
-                          {(!editingGym.trainers || editingGym.trainers.length === 0) && <div className="text-center py-2 text-gray-300 text-[10px]">No trainers yet</div>}
-                        </div>
-
-                        {/* Add Trainer Inputs */}
-                        <div className="flex flex-col gap-2 border-t border-gray-100 pt-2">
-                          <div className="flex gap-2">
-                            <input
-                              className="border p-1 text-[10px] font-mono bg-gray-50 w-full"
-                              placeholder="Name"
-                              value={newTrainer.name}
-                              onChange={e => setNewTrainer({ ...newTrainer, name: e.target.value })}
-                            />
-                            <input
-                              className="border p-1 text-[10px] font-mono bg-gray-50 w-full"
-                              placeholder="Specialty (e.g. Boxing)"
-                              value={newTrainer.specialty}
-                              onChange={e => setNewTrainer({ ...newTrainer, specialty: e.target.value })}
-                            />
-                          </div>
-                          <div className="flex gap-2">
-                            <input
-                              className="border p-1 text-[10px] font-mono bg-gray-50 w-full"
-                              placeholder="Price (+THB)"
-                              type="number"
-                              value={newTrainer.pricePerSession}
-                              onChange={e => setNewTrainer({ ...newTrainer, pricePerSession: Number(e.target.value) })}
-                            />
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="border p-1 text-[10px] font-mono bg-gray-50 w-full file:mr-2 file:border-0 file:bg-brand-charcoal file:text-white file:text-[10px] file:px-2 file:cursor-pointer"
-                              onChange={async (e) => {
-                                const file = e.target.files?.[0];
-                                if (file) {
-                                  try {
-                                    e.target.disabled = true;
-                                    const { uploadImage } = await import('../services/dataService');
-                                    const url = await uploadImage('trainers', file);
-                                    if (url) setNewTrainer({ ...newTrainer, image: url });
-                                  } catch (err) {
-                                    alert("Failed to upload image");
-                                  } finally {
-                                    e.target.disabled = false;
-                                  }
-                                }
-                              }}
-                            />
-                            <button type="button" onClick={handleAddTrainer} className="bg-brand-blue text-white px-2 rounded hover:bg-blue-600 flex items-center justify-center">
-                              <Plus className="w-3 h-3" />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="flex gap-2 justify-end pt-2 border-t border-brand-charcoal">
-                      <button type="button" onClick={() => setIsGymFormOpen(false)} className="px-4 py-2 font-mono text-xs font-bold uppercase hover:bg-gray-200">Cancel</button>
-                      <button type="submit" className="px-4 py-2 bg-brand-charcoal text-white font-mono text-xs font-bold uppercase hover:bg-green-600">Save Changes</button>
-                    </div>
-                  </form>
-                )}
+          {activeTab === 'gyms' && (
+            <BlockTable title="Gym Inventory" icon={<Layers className="w-4 h-4" />}>
+               <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                <span className="font-mono text-xs text-gray-500">{gyms.length} Active Listings</span>
+                <button onClick={() => { setEditingGym({}); setIsGymFormOpen(true); }} className="bg-brand-charcoal text-white px-3 py-1 font-mono text-xs font-bold uppercase flex items-center gap-2 hover:bg-brand-blue">
+                  <Plus className="w-3 h-3" /> Add Gym
+                </button>
               </div>
-            )}
-
-            <div className="max-h-[300px] overflow-y-auto divide-y divide-gray-100">
-              {gyms.map(g => (
-                <div key={g.id} className={`p-4 flex justify-between items-center hover:bg-gray-50 group border-l-4 ${g.approvalStatus === 'approved' ? 'border-green-500' : g.approvalStatus === 'rejected' ? 'bg-red-50/50 border-red-500' : 'bg-orange-50/20 border-orange-500'}`}>
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-gray-200 shrink-0 overflow-hidden border border-gray-300">
-                      {g.images?.[0] && <img src={g.images[0]} className="w-full h-full object-cover" />}
-                    </div>
+              <div className="divide-y divide-gray-100">
+                {gyms.map(gym => (
+                   <div key={gym.id} className="p-4 flex justify-between items-center bg-white hover:bg-gray-50 transition-colors">
                     <div>
-                      <div className="font-bold text-sm uppercase text-brand-charcoal flex items-center gap-2">
-                        {g.name}
-                        {g.approvalStatus === 'approved' ? (
-                          <span title="Verified" className="text-green-500 flex items-center gap-1 text-[10px]"><Check className="w-3 h-3" /> Approved</span>
-                        ) : g.approvalStatus === 'rejected' ? (
-                          <span className="bg-red-500 text-white text-[9px] px-1 rounded-sm uppercase tracking-wider">Rejected</span>
+                      <div className="font-bold text-sm uppercase flex items-center gap-2">
+                        {gym.name}
+                        {gym.approvalStatus === 'approved' ? (
+                          <span className="bg-green-100 text-green-700 text-[8px] px-2 py-0.5 rounded-full font-black border border-green-200">APPROVED</span>
+                        ) : gym.approvalStatus === 'rejected' ? (
+                          <span className="bg-red-100 text-red-700 text-[8px] px-2 py-0.5 rounded-full font-black border border-red-200">REJECTED</span>
                         ) : (
-                          <span className="bg-orange-500 text-white text-[9px] px-1 rounded-sm uppercase tracking-wider animate-pulse">Pending Review</span>
+                          <span className="bg-yellow-100 text-yellow-700 text-[8px] px-2 py-0.5 rounded-full font-black border border-yellow-200 uppercase">Pending</span>
                         )}
                       </div>
-                      <div className="font-mono text-xs text-gray-400">{g.location} • ฿{g.basePrice}</div>
+                      <div className="text-[10px] text-gray-400 font-mono uppercase">{gym.location} • {gym.category}</div>
                     </div>
-                  </div>
-                  <div className="flex gap-2">
-                    {g.approvalStatus === 'pending' ? (
-                      <>
-                        <button
-                          onClick={async () => {
-                            try {
-                              await updateGymApprovalStatus(g.id, 'approved');
-                              await loadGyms();
-                            } catch (err) {
-                              alert("Failed to approve gym");
-                            }
-                          }}
-                          className="font-mono text-[10px] font-bold uppercase px-2 py-1 bg-green-500 text-white hover:bg-green-600 transition-colors"
-                        >Approve</button>
-                        <button
-                          onClick={async () => {
-                            try {
-                              await updateGymApprovalStatus(g.id, 'rejected');
-                              await loadGyms();
-                            } catch (err) {
-                              alert("Failed to reject gym");
-                            }
-                          }}
-                          className="font-mono text-[10px] font-bold uppercase px-2 py-1 bg-red-500 text-white hover:bg-red-600 transition-colors"
-                        >Reject</button>
-                      </>
-                    ) : (
-                      <button
-                        onClick={async () => {
-                          try {
-                            const newStatus = g.approvalStatus === 'approved' ? 'rejected' : 'approved';
-                            await updateGymApprovalStatus(g.id, newStatus);
-                            await loadGyms();
-                          } catch (err) {
-                            console.error(err);
-                            alert("Failed to update gym verification status");
-                          }
-                        }}
-                        className={`font-mono text-[10px] font-bold uppercase px-2 py-1 transition-colors ${g.approvalStatus === 'approved' ? 'text-gray-500 border border-gray-300 hover:bg-gray-100' : 'bg-gray-800 text-white hover:bg-gray-900'}`}
-                      >
-                        {g.approvalStatus === 'approved' ? 'Revoke' : 'Re-Approve'}
-                      </button>
-                    )}
-                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => { setEditingGym(g); setIsGymFormOpen(true); }} className="p-2 hover:bg-blue-100 text-brand-blue rounded">
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => handleDeleteGym(g.id)} className="p-2 hover:bg-red-100 text-brand-red rounded">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </BlockTable>
-
-          {/* Course / Curriculum Management */}
-          <BlockTable title="Course Curriculum Design" icon={<BookOpen className="w-4 h-4" />}>
-            <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-              <span className="font-mono text-xs text-brand-blue font-bold uppercase">Flexible Course Designer</span>
-              <button
-                onClick={() => { setEditingCourse({ designData: { modules: [] } }); setIsCourseFormOpen(true); }}
-                className={`w-full text-left px-4 py-3 font-mono text-xs font-bold uppercase transition-colors flex items-center gap-3 ${activeTab === 'courses' ? 'bg-brand-blue text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'}`}
-              >
-                <BookOpen className="w-4 h-4" />
-                Training Courses
-              </button>
-              <button
-                onClick={() => setActiveTab('appearance')}
-                className={`w-full text-left px-4 py-3 font-mono text-xs font-bold uppercase transition-colors flex items-center gap-3 ${activeTab === 'appearance' ? 'bg-brand-charcoal text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'}`}
-              >
-                <Layers className="w-4 h-4" />
-                Appearance
-              </button>
-              <button
-                onClick={() => setActiveTab('settings')}
-                className={`w-full text-left px-4 py-3 font-mono text-xs font-bold uppercase transition-colors flex items-center gap-3 ${activeTab === 'settings' ? 'bg-brand-charcoal text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'}`}
-              >
-                <Layers className="w-4 h-4" />
-                Settings
-              </button>
-            </div>
-
-            {isCourseFormOpen && (
-              <div className="p-6 bg-brand-bone border-b-2 border-brand-charcoal animate-reveal">
-                <form onSubmit={handleSaveCourse} className="space-y-4">
-                  <div className="flex justify-between items-center mb-2 border-b border-gray-300 pb-2">
-                    <h4 className="font-black uppercase text-sm">Course Metadata</h4>
-                    <button type="button" onClick={() => setIsCourseFormOpen(false)} className="text-xs font-mono underline hover:text-brand-red">Close</button>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-[10px] uppercase font-bold mb-1">Title</label>
-                      <input className="w-full border p-2 font-mono text-xs" value={editingCourse.title || ''} onChange={e => setEditingCourse({ ...editingCourse, title: e.target.value })} placeholder="e.g. 10-Day Intensive" required />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] uppercase font-bold mb-1">Gym Location</label>
-                      <select className="w-full border p-2 font-mono text-xs" value={editingCourse.gymId || ''} onChange={e => setEditingCourse({ ...editingCourse, gymId: e.target.value })} required>
-                        <option value="">Select Gym...</option>
-                        {gyms.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-[10px] uppercase font-bold mb-1">Price (THB)</label>
-                      <input type="number" className="w-full border p-2 font-mono text-xs" value={editingCourse.price || ''} onChange={e => setEditingCourse({ ...editingCourse, price: Number(e.target.value) })} />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] uppercase font-bold mb-1">Duration string</label>
-                      <input className="w-full border p-2 font-mono text-xs" value={editingCourse.duration || ''} onChange={e => setEditingCourse({ ...editingCourse, duration: e.target.value })} placeholder="e.g. 2 Weeks" />
-                    </div>
-                  </div>
-
-                  <div className="pt-4 border-t border-gray-200">
-                    <div className="flex justify-between items-center mb-4">
-                      <label className="font-black uppercase text-sm flex items-center gap-2">
-                        <Layers className="w-4 h-4 text-brand-blue" />
-                        Modules / Curriculum
-                      </label>
-                      <button type="button" onClick={addModuleToCourse} className="text-[10px] font-mono font-bold uppercase border border-brand-charcoal px-2 py-1 hover:bg-brand-charcoal hover:text-white transition-colors">
-                        + Add Module
-                      </button>
-                    </div>
-
-                    <div className="space-y-4">
-                      {editingCourse.designData?.modules?.map((mod: any, idx: number) => (
-                        <div key={idx} className="bg-white p-3 border border-gray-200 shadow-sm relative group">
-                          <button type="button" onClick={() => removeModule(idx)} className="absolute top-2 right-2 text-gray-300 hover:text-red-500">
-                            <X className="w-3 h-3" />
-                          </button>
-                          <div className="mb-2">
-                            <input
-                              className="font-bold text-xs uppercase w-full bg-transparent outline-none border-b border-transparent focus:border-brand-blue mb-1"
-                              value={mod.title}
-                              onChange={e => updateModule(idx, 'title', e.target.value)}
-                              placeholder="Module Title"
-                            />
-                            <textarea
-                              className="w-full text-xs font-mono text-gray-500 bg-gray-50 p-2 outline-none h-16 resize-none"
-                              value={mod.content}
-                              onChange={e => updateModule(idx, 'content', e.target.value)}
-                              placeholder="Description or content..."
-                            />
-                          </div>
-                        </div>
-                      ))}
-                      {(!editingCourse.designData?.modules || editingCourse.designData.modules.length === 0) && (
-                        <div className="text-center py-8 border-2 border-dashed border-gray-200 text-gray-300 font-mono text-xs">
-                          Start designing your course structure
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end pt-4 gap-2">
-                    <button type="button" onClick={() => setIsCourseFormOpen(false)} className="px-4 py-2 font-mono text-xs font-bold uppercase hover:bg-gray-200">Cancel</button>
-                    <button type="submit" className="px-6 py-2 bg-brand-charcoal text-white font-mono text-xs font-bold uppercase hover:bg-green-600 shadow-[4px_4px_0px_0px_#1A1A1A]">Save Course</button>
-                  </div>
-                </form>
-              </div>
-            )}
-
-            <div className="max-h-[300px] overflow-y-auto divide-y divide-gray-100">
-              {courses.map(c => (
-                <div key={c.id} className="p-4 flex justify-between items-center hover:bg-gray-50 group">
-                  <div>
-                    <div className="font-bold text-sm uppercase text-brand-charcoal">{c.title}</div>
-                    <div className="font-mono text-xs text-brand-blue flex items-center gap-2">
-                      {gyms.find(g => g.id === c.gymId)?.name || 'Unknown Gym'}
-                      <span className="text-gray-300">•</span>
-                      {c.designData?.modules?.length || 0} Modules
-                    </div>
-                  </div>
-                  <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => { setEditingCourse(c); setIsCourseFormOpen(true); }} className="p-2 hover:bg-blue-100 text-brand-blue rounded">
-                      <Edit className="w-4 h-4" />
-                    </button>
-                    <button onClick={() => handleDeleteCourse(c.id)} className="p-2 hover:bg-red-100 text-brand-red rounded">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-              {courses.length === 0 && <div className="p-8 text-center font-mono text-xs text-gray-400">No courses defined</div>}
-            </div>
-          </BlockTable>
-
-          <BlockTable title="Pending Affiliates" icon={<Users className="w-4 h-4" />}>
-            {applications.length === 0 ? (
-              <div className="p-8 text-center font-mono text-sm text-gray-400">NO PENDING APPLICATIONS</div>
-            ) : (
-              <div className="divide-y-2 divide-gray-100 max-h-[400px] overflow-y-auto">
-                {applications.map(app => (
-                  <div key={app.id} className="p-6 bg-white hover:bg-gray-50 transition-colors">
-                    <div className="flex flex-col sm:flex-row justify-between items-start mb-4 gap-2">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-brand-bone border border-brand-charcoal flex items-center justify-center font-bold text-xs shrink-0">
-                          {app.userName.charAt(0)}
-                        </div>
-                        <div className="min-w-0">
-                          <div className="font-black text-sm uppercase text-brand-charcoal truncate">{app.userName}</div>
-                          <Mono className="text-gray-400 block truncate">ID: {app.id}</Mono>
-                        </div>
-                      </div>
-                      <div className="bg-brand-blue text-white text-[10px] font-bold px-2 py-1 uppercase tracking-wider shrink-0">
-                        Action Reqd
-                      </div>
-                    </div>
-
-                    <div className="mb-6 pl-0 sm:pl-11">
-                      <p className="font-mono text-xs text-brand-blue mb-1 uppercase font-bold">Statement:</p>
-                      <p className="text-sm text-gray-600 font-mono bg-brand-bone p-3 border border-gray-200 italic break-words">
-                        "{app.reason}"
-                      </p>
-                    </div>
-
-                    <div className="flex gap-4 pl-0 sm:pl-11">
-                      <button
-                        onClick={() => handleApprove(app.id, true)}
-                        className="flex-1 bg-brand-charcoal text-white font-bold uppercase text-xs py-3 hover:bg-green-600 transition-colors flex items-center justify-center gap-2"
-                      >
-                        <Check className="w-4 h-4" /> Approve
-                      </button>
-                      <button
-                        onClick={() => handleApprove(app.id, false)}
-                        className="flex-1 border-2 border-brand-charcoal text-brand-charcoal font-bold uppercase text-xs py-3 hover:bg-brand-red hover:text-white hover:border-brand-red transition-colors flex items-center justify-center gap-2"
-                      >
-                        <X className="w-4 h-4" /> Deny
-                      </button>
+                    <div className="flex gap-2">
+                      <button onClick={() => { setEditingGym(gym); setIsGymFormOpen(true); }} className="p-2 text-gray-400 hover:text-brand-blue"><Edit className="w-4 h-4" /></button>
+                      <button onClick={() => handleDeleteGym(gym.id)} className="p-2 text-gray-400 hover:text-brand-red"><Trash2 className="w-4 h-4" /></button>
                     </div>
                   </div>
                 ))}
               </div>
-            )}
-          </BlockTable>
+            </BlockTable>
+          )}
 
-          {/* Appearance Panel */}
-          {activeTab === 'appearance' && (
-            <BlockTable title="Appearance Settings" icon={<Layers className="w-4 h-4" />}>
-              <div className="p-6 bg-white space-y-8">
-                <div>
-                  <h4 className="font-black uppercase text-brand-charcoal mb-4">Hero Carousel Images</h4>
-                  <div className="text-sm font-mono text-gray-500 mb-6 border-l-2 border-brand-blue pl-4">
-                    Upload images to be displayed in the background of the Home page hero section. They will automatically rotate.
+          {activeTab === 'announcements' && (
+             <BlockTable title="Broadcast News" icon={<Megaphone className="w-4 h-4" />}>
+              <div className="p-6 border-b-2 border-gray-100 bg-gray-50">
+                <input className="w-full bg-white border border-gray-300 p-3 mb-2 font-mono text-sm" placeholder="HEADLINE..." value={newsTitle} onChange={e => setNewsTitle(e.target.value)} />
+                <textarea className="w-full bg-white border border-gray-300 p-3 mb-4 font-mono text-sm h-20" placeholder="Announcement content..." value={newsContent} onChange={e => setNewsContent(e.target.value)}></textarea>
+                <button onClick={handlePostNews} disabled={isPosting} className="w-full bg-brand-charcoal text-white font-bold uppercase py-3 hover:bg-brand-blue transition-colors disabled:opacity-50">
+                  {isPosting ? 'Publishing...' : 'Publish Announcement'}
+                </button>
+              </div>
+              <div className="divide-y divide-gray-100">
+                {announcements.map(a => (
+                  <div key={a.id} className="p-4 flex justify-between items-start">
+                    <div>
+                      <div className="font-black uppercase text-sm">{a.title}</div>
+                      <p className="text-[10px] text-gray-400 font-mono">{new Date(a.createdAt).toLocaleDateString()}</p>
+                    </div>
+                    <button onClick={() => handleDeleteNews(a.id)} className="text-gray-300 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
                   </div>
+                ))}
+              </div>
+            </BlockTable>
+          )}
 
-                  {/* List of current hero images */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          {activeTab === 'courses' && (
+             <BlockTable title="Course Curriculum" icon={<BookOpen className="w-4 h-4" />}>
+               <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                <span className="font-mono text-xs text-gray-500">{courses.length} Active Courses</span>
+                <button onClick={() => { setEditingCourse({ designData: { modules: [] } }); setIsCourseFormOpen(true); }} className="bg-brand-charcoal text-white px-3 py-1 font-mono text-xs font-bold uppercase flex items-center gap-2 hover:bg-brand-blue">
+                  <Plus className="w-3 h-3" /> New Course
+                </button>
+              </div>
+              <div className="divide-y divide-gray-100">
+                {courses.map(course => (
+                  <div key={course.id} className="p-4 flex justify-between items-center">
+                    <div>
+                      <div className="font-bold text-sm uppercase">{course.title}</div>
+                      <div className="text-[10px] text-gray-400 font-mono">฿{course.price}</div>
+                    </div>
+                    <div className="flex gap-2">
+                       <button onClick={() => { setEditingCourse(course); setIsCourseFormOpen(true); }} className="p-2 text-gray-400 hover:text-brand-blue"><Edit className="w-4 h-4" /></button>
+                       <button onClick={() => handleDeleteCourse(course.id)} className="p-2 text-gray-400 hover:text-brand-red"><Trash2 className="w-4 h-4" /></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </BlockTable>
+          )}
+
+          {activeTab === 'shop' && <ProductManagement />}
+
+          {activeTab === 'appearance' && (
+            <BlockTable title="Appearance Settings" icon={<Plus className="w-4 h-4" />}>
+              <div className="p-6 space-y-8">
+                <div>
+                  <h4 className="font-black uppercase text-sm mb-4">Hero Carousel Images</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                     {heroImages.map((url, idx) => (
-                      <div key={idx} className="relative group border border-gray-200 aspect-video md:aspect-square bg-gray-100 overflow-hidden">
-                        <img src={url} alt={`Hero ${idx + 1}`} className="w-full h-full object-cover" />
-                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <button
-                            onClick={() => handleDeleteHeroImage(idx)}
-                            className="bg-brand-red text-white p-2 rounded-full hover:bg-white hover:text-brand-red transition-colors"
-                            title="Remove Image"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
+                      <div key={idx} className="relative aspect-video bg-gray-100 border overflow-hidden group">
+                        <img src={url} className="w-full h-full object-cover" />
+                        <button onClick={() => handleDeleteHeroImage(idx)} className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity">
+                          <Trash2 className="w-5 h-5" />
+                        </button>
                       </div>
                     ))}
-                    {heroImages.length === 0 && (
-                      <div className="col-span-2 md:col-span-4 p-8 border-2 border-dashed border-gray-300 text-center font-mono text-sm text-gray-400">
-                        No hero images uploaded yet.<br />Default placeholder will be shown.
-                      </div>
-                    )}
                   </div>
-
-                  {/* Upload new image */}
-                  <div>
-                    <label className={`block flex items-center justify-center border-2 border-brand-charcoal border-dashed p-6 cursor-pointer hover:bg-brand-bone transition-colors ${isUploadingHero ? 'opacity-50 pointer-events-none' : ''}`}>
-                      <div className="flex flex-col items-center">
-                        <Plus className="w-6 h-6 text-brand-charcoal mb-2" />
-                        <span className="font-mono text-sm font-bold uppercase text-brand-charcoal">
-                          {isUploadingHero ? 'Uploading...' : 'Add New Image'}
-                        </span>
-                        <span className="font-mono text-[10px] text-gray-500 mt-1">Recommended: High quality, landscape orientation</span>
-                      </div>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={handleHeroFileUpload}
-                        disabled={isUploadingHero}
-                      />
-                    </label>
-                  </div>
+                  <label className="block border-2 border-dashed border-gray-300 p-8 text-center cursor-pointer hover:bg-gray-50 transition-colors">
+                    <span className="font-mono text-xs uppercase font-bold text-gray-400">Add Hero image</span>
+                    <input type="file" className="hidden" accept="image/*" onChange={handleHeroFileUpload} disabled={isUploadingHero} />
+                  </label>
                 </div>
               </div>
             </BlockTable>
           )}
 
+          {activeTab === 'settings' && (
+            <BlockTable title="System Settings" icon={<Plus className="w-4 h-4" />}>
+              <div className="p-6 space-y-6">
+                <div>
+                  <label className="block font-mono text-[10px] uppercase font-bold text-gray-400 mb-2">PromptPay Number</label>
+                  <input type="text" value={promptPayNumber} onChange={e => setPromptPayNumber(e.target.value)} className="w-full border-2 border-brand-charcoal p-3 font-mono text-lg" placeholder="08X-XXX-XXXX" />
+                </div>
+                <button onClick={handleSaveSettings} disabled={isSettingsLoading} className="bg-brand-charcoal text-white font-black uppercase py-4 px-10 hover:bg-brand-red transition-all">
+                  {isSettingsLoading ? 'Saving...' : 'Update Config'}
+                </button>
+              </div>
+            </BlockTable>
+          )}
         </div>
       </div>
+
+      {isGymFormOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-brand-charcoal/80 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-4xl max-h-[90vh] overflow-auto border-4 border-brand-charcoal shadow-[12px_12px_0px_0px_rgba(0,0,0,0.2)]">
+            <div className="sticky top-0 p-4 border-b-2 border-brand-charcoal bg-brand-bone flex justify-between items-center">
+              <h2 className="font-black uppercase tracking-widest">{editingGym?.id ? 'Edit Gym' : 'New Listing'}</h2>
+              <button onClick={() => setIsGymFormOpen(false)} className="hover:text-brand-red"><X className="w-6 h-6" /></button>
+            </div>
+            <form onSubmit={handleSaveGym} className="p-8 space-y-8">
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <input className="border-2 border-brand-charcoal p-4 font-mono text-sm" placeholder="GYM NAME" value={editingGym?.name || ''} onChange={e => setEditingGym({...editingGym, name: e.target.value})} />
+                <input className="border-2 border-brand-charcoal p-4 font-mono text-sm" placeholder="LOCATION" value={editingGym?.location || ''} onChange={e => setEditingGym({...editingGym, location: e.target.value})} />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <select className="border-2 border-brand-charcoal p-4 font-mono text-sm" value={editingGym?.category || 'gym'} onChange={e => setEditingGym({...editingGym, category: e.target.value as 'gym' | 'camp'})}>
+                  <option value="gym">Gym</option>
+                  <option value="camp">Camp</option>
+                </select>
+                <input type="number" className="border-2 border-brand-charcoal p-4 font-mono text-sm" placeholder="PRICE (THB)" value={editingGym?.basePrice || ''} onChange={e => setEditingGym({...editingGym, basePrice: parseFloat(e.target.value)})} />
+                <input type="number" className="border-2 border-brand-charcoal p-4 font-mono text-sm" placeholder="AFFILIATE %" value={editingGym?.affiliatePercentage || ''} onChange={e => setEditingGym({...editingGym, affiliatePercentage: parseFloat(e.target.value)})} title="Commission for affiliates" />
+              </div>
+
+              {editingGym?.category === 'camp' && (
+                <div className="grid grid-cols-2 gap-4 p-4 bg-brand-bone border-2 border-brand-charcoal">
+                    <div>
+                        <label className="block text-[10px] uppercase font-bold text-gray-400 mb-1">Start Date</label>
+                        <input type="date" className="w-full border-2 border-brand-charcoal p-2 font-mono text-xs" value={editingGym?.startDate || ''} onChange={e => setEditingGym({...editingGym, startDate: e.target.value})} />
+                    </div>
+                    <div>
+                        <label className="block text-[10px] uppercase font-bold text-gray-400 mb-1">End Date</label>
+                        <input type="date" className="w-full border-2 border-brand-charcoal p-2 font-mono text-xs" value={editingGym?.endDate || ''} onChange={e => setEditingGym({...editingGym, endDate: e.target.value})} />
+                    </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-brand-bone/50 p-4 border-2 border-brand-charcoal">
+                <div className="flex items-center gap-3">
+                    <input type="checkbox" id="isFlashSale" checked={editingGym?.isFlashSale || false} onChange={e => setEditingGym({...editingGym, isFlashSale: e.target.checked})} className="w-5 h-5 accent-brand-red" />
+                    <label htmlFor="isFlashSale" className="font-black uppercase text-xs">Flash Sale Active</label>
+                </div>
+                <div className="flex items-center gap-3">
+                    <input type="checkbox" id="isVerified" checked={editingGym?.isVerified || false} onChange={e => {
+                        const verified = e.target.checked;
+                        setEditingGym({...editingGym, isVerified: verified, approvalStatus: verified ? 'approved' : 'pending'});
+                    }} className="w-5 h-5 accent-brand-blue" />
+                    <label htmlFor="isVerified" className="font-black uppercase text-xs">Is Verified / Approved</label>
+                </div>
+                {editingGym?.isFlashSale && (
+                    <div className="flex items-center gap-3">
+                        <label className="font-mono text-[10px] uppercase font-bold text-gray-400">Discount %</label>
+                        <input type="number" value={editingGym?.flashSaleDiscount || 0} onChange={e => setEditingGym({...editingGym, flashSaleDiscount: parseInt(e.target.value)})} className="w-20 border-2 border-brand-charcoal p-2 font-mono text-xs" />
+                    </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-xs font-bold uppercase">Profile / Cover Photo</label>
+                <div className="flex gap-4 items-center">
+                    {editingGym?.profilePhoto && <img src={editingGym.profilePhoto} className="w-20 h-20 object-cover border-4 border-brand-charcoal" alt="Preview" />}
+                    <input type="file" accept="image/*" onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                            try {
+                                const { uploadImage } = await import('../services/dataService');
+                                const url = await uploadImage('gyms', file);
+                                if (url) setEditingGym({...editingGym, profilePhoto: url});
+                            } catch (err) { alert("Upload failed"); }
+                        }
+                    }} className="flex-1 border-2 border-brand-charcoal p-4 font-mono text-sm file:mr-4 file:py-2 file:px-4 file:border-0 file:text-xs file:font-black file:uppercase file:bg-brand-charcoal file:text-white" />
+                </div>
+              </div>
+
+              <textarea className="w-full border-2 border-brand-charcoal p-4 font-mono text-sm h-32" placeholder="DESCRIPTION" value={editingGym?.description || ''} onChange={e => setEditingGym({...editingGym, description: e.target.value})}></textarea>
+              <button type="submit" className="w-full bg-brand-red text-white py-4 font-black uppercase hover:bg-brand-charcoal transition-colors">Save Listing</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isCourseFormOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-brand-charcoal/80 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-4xl max-h-[90vh] overflow-auto border-4 border-brand-charcoal shadow-[12px_12px_0px_0px_rgba(0,0,0,0.2)]">
+             <div className="sticky top-0 p-4 border-b-2 border-brand-charcoal bg-brand-bone flex justify-between items-center">
+              <h2 className="font-black uppercase tracking-widest">Manage Course</h2>
+              <button onClick={() => setIsCourseFormOpen(false)} className="hover:text-brand-red"><X className="w-6 h-6" /></button>
+            </div>
+             <form onSubmit={handleSaveCourse} className="p-8 space-y-6">
+                <input className="w-full border-2 border-brand-charcoal p-4 font-mono text-sm" placeholder="COURSE TITLE" value={editingCourse?.title || ''} onChange={e => setEditingCourse({...editingCourse, title: e.target.value})} />
+                <textarea className="w-full border-2 border-brand-charcoal p-4 font-mono text-sm h-24" placeholder="DESCRIPTION" value={editingCourse?.description || ''} onChange={e => setEditingCourse({...editingCourse, description: e.target.value})}></textarea>
+                <div className="grid grid-cols-2 gap-4">
+                   <select className="border-2 border-brand-charcoal p-4 font-mono text-sm" value={editingCourse?.gymId || ''} onChange={e => setEditingCourse({...editingCourse, gymId: e.target.value})}>
+                    <option value="">Select Gym</option>
+                    {gyms.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                  </select>
+                  <input type="number" className="border-2 border-brand-charcoal p-4 font-mono text-sm" placeholder="PRICE (THB)" value={editingCourse?.price || ''} onChange={e => setEditingCourse({...editingCourse, price: parseFloat(e.target.value)})} />
+                </div>
+                <button type="submit" className="w-full bg-brand-blue text-white py-4 font-black uppercase hover:bg-brand-charcoal transition-all">Store Course</button>
+             </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

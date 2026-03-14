@@ -46,24 +46,32 @@ const Navbar: React.FC<NavbarProps> = ({ activeUser, onLogout }) => {
             {activeUser && (
               <>
                 <Link
-                  to={activeUser.role === 'customer' ? '/dashboard' : activeUser.role === 'owner' ? '/owner' : '/admin'}
+                  to={activeUser.role === 'customer' ? '/dashboard' : (activeUser.role as string) === 'gymowner' ? '/owner' : '/admin'}
                   className="font-mono text-xs uppercase tracking-widest text-brand-charcoal hover:text-brand-red transition-colors"
                 >
                   Dashboard
                 </Link>
-                {(activeUser.role === 'admin' || activeUser.role === 'owner') && (
+                {(activeUser.role === 'admin' || (activeUser.role as string) === 'gymowner') && (
+                  <Link
+                    to="/analytics"
+                    className="font-mono text-xs uppercase tracking-widest text-brand-charcoal hover:text-brand-red transition-colors"
+                  >
+                    Analytics
+                  </Link>
+                )}
+                {activeUser.role === 'admin' && (
                   <>
-                    <Link
-                      to="/analytics"
-                      className="font-mono text-xs uppercase tracking-widest text-brand-charcoal hover:text-brand-red transition-colors"
-                    >
-                      Analytics
-                    </Link>
                     <Link
                       to="/shop-admin"
                       className="font-mono text-xs uppercase tracking-widest text-brand-charcoal hover:text-brand-red transition-colors"
                     >
-                      Shop
+                      Shop Management
+                    </Link>
+                    <Link
+                      to="/admin/users"
+                      className="font-mono text-xs uppercase tracking-widest text-brand-charcoal hover:text-brand-red transition-colors"
+                    >
+                      Users Management
                     </Link>
                   </>
                 )}
@@ -123,27 +131,36 @@ const Navbar: React.FC<NavbarProps> = ({ activeUser, onLogout }) => {
             {activeUser && (
               <>
                 <Link
-                  to={activeUser.role === 'customer' ? '/dashboard' : activeUser.role === 'owner' ? '/owner' : '/admin'}
+                  to={activeUser.role === 'customer' ? '/dashboard' : (activeUser.role as string) === 'gymowner' ? '/owner' : '/admin'}
                   onClick={closeMobileMenu}
                   className="font-mono text-sm uppercase tracking-widest text-brand-charcoal hover:text-brand-red transition-colors"
                 >
                   Dashboard
                 </Link>
-                {(activeUser.role === 'admin' || activeUser.role === 'owner') && (
+                {(activeUser.role === 'admin' || (activeUser.role as string) === 'gymowner') && (
+                  <Link
+                    to="/analytics"
+                    onClick={closeMobileMenu}
+                    className="font-mono text-sm uppercase tracking-widest text-brand-charcoal hover:text-brand-red transition-colors"
+                  >
+                    Analytics
+                  </Link>
+                )}
+                {activeUser.role === 'admin' && (
                   <>
-                    <Link
-                      to="/analytics"
-                      onClick={closeMobileMenu}
-                      className="font-mono text-sm uppercase tracking-widest text-brand-charcoal hover:text-brand-red transition-colors"
-                    >
-                      Analytics
-                    </Link>
                     <Link
                       to="/shop-admin"
                       onClick={closeMobileMenu}
                       className="font-mono text-sm uppercase tracking-widest text-brand-charcoal hover:text-brand-red transition-colors"
                     >
                       Shop
+                    </Link>
+                    <Link
+                      to="/admin/users"
+                      onClick={closeMobileMenu}
+                      className="font-mono text-sm uppercase tracking-widest text-brand-charcoal hover:text-brand-red transition-colors"
+                    >
+                      Users
                     </Link>
                   </>
                 )}

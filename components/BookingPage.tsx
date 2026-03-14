@@ -124,6 +124,11 @@ const BookingPage: React.FC<BookingPageProps> = ({ gyms, user, setBookings }) =>
         const foundGym = gyms.find(g => g.id === gymId);
         if (foundGym && (foundGym.isVerified || foundGym.approvalStatus === 'approved')) {
             setGym(foundGym);
+            // Auto-fill dates for Camps
+            if (foundGym.category === 'camp' && foundGym.startDate) {
+                setStartDate(foundGym.startDate);
+                if (foundGym.endDate) setEndDate(foundGym.endDate);
+            }
         } else {
             navigate('/');
         }
@@ -361,11 +366,12 @@ const BookingPage: React.FC<BookingPageProps> = ({ gyms, user, setBookings }) =>
                                             <input
                                                 type="date"
                                                 value={startDate}
+                                                disabled={gym.category === 'camp' && !!gym.startDate}
                                                 onChange={(e) => {
                                                     setStartDate(e.target.value);
                                                     if (!endDate) setEndDate(e.target.value);
                                                 }}
-                                                className="w-full bg-brand-bone border-2 border-gray-200 p-4 font-mono text-brand-charcoal text-xs focus:border-brand-blue focus:outline-none transition-colors"
+                                                className={`w-full bg-brand-bone border-2 border-gray-200 p-4 font-mono text-brand-charcoal text-xs focus:border-brand-blue focus:outline-none transition-colors ${gym.category === 'camp' && gym.startDate ? 'opacity-50 cursor-not-allowed' : ''}`}
                                             />
                                         </div>
                                         {type !== 'course' && (
@@ -375,8 +381,9 @@ const BookingPage: React.FC<BookingPageProps> = ({ gyms, user, setBookings }) =>
                                                     type="date"
                                                     value={endDate}
                                                     min={startDate}
+                                                    disabled={gym.category === 'camp' && !!gym.endDate}
                                                     onChange={(e) => setEndDate(e.target.value)}
-                                                    className="w-full bg-brand-bone border-2 border-gray-200 p-4 font-mono text-brand-charcoal text-xs focus:border-brand-blue focus:outline-none transition-colors"
+                                                    className={`w-full bg-brand-bone border-2 border-gray-200 p-4 font-mono text-brand-charcoal text-xs focus:border-brand-blue focus:outline-none transition-colors ${gym.category === 'camp' && gym.endDate ? 'opacity-50 cursor-not-allowed' : ''}`}
                                                 />
                                             </div>
                                         )}

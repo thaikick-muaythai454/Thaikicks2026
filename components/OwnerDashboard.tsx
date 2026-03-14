@@ -8,6 +8,7 @@ interface OwnerDashboardProps {
     user: User;
     gyms: Gym[];
     updateGym: (gym: Gym) => void;
+    refreshGyms: () => void;
     bookings: Booking[];
 }
 
@@ -34,7 +35,7 @@ const Mono: React.FC<{ children: React.ReactNode; className?: string }> = ({ chi
     </span>
 );
 
-const OwnerDashboard: React.FC<OwnerDashboardProps> = ({ user, gyms, updateGym, bookings }) => {
+const OwnerDashboard: React.FC<OwnerDashboardProps> = ({ user, gyms, updateGym, refreshGyms, bookings }) => {
     const [myGym, setMyGym] = useState<Gym | null>(null);
     const [editingGym, setEditingGym] = useState<Partial<Gym> | null>(null);
     const [isGymFormOpen, setIsGymFormOpen] = useState(false);
@@ -75,9 +76,9 @@ const OwnerDashboard: React.FC<OwnerDashboardProps> = ({ user, gyms, updateGym, 
 
             setIsGymFormOpen(false);
             setEditingGym(null);
-        } catch (err) {
+        } catch (err: any) {
             console.error(err);
-            alert("Failed to save gym. Please check your connection and try again.");
+            alert("Failed to save gym: " + (err.message || String(err)));
         }
     };
 
@@ -108,23 +109,63 @@ const OwnerDashboard: React.FC<OwnerDashboardProps> = ({ user, gyms, updateGym, 
                                             ...editingGym,
                                             ownerId: user.id
                                         } as Gym);
-                                        window.location.reload();
-                                    } catch (err) {
-                                        alert("Failed to create facility.");
+                                        refreshGyms();
+                                    } catch (err: any) {
+                                        alert("Failed to create facility: " + (err.message || String(err)));
                                     }
                                 }
                             }}>
-                                <input className="border p-2 text-xs font-mono w-full" value={editingGym?.name || ''} onChange={e => setEditingGym({ ...editingGym, name: e.target.value })} placeholder="Gym / Camp Name" required />
+                                <div className="grid grid-cols-2 gap-4">
+                                    <input className="border p-2 text-xs font-mono w-full" value={editingGym?.name || ''} onChange={e => setEditingGym({ ...editingGym, name: e.target.value })} placeholder="Gym / Camp Name" required />
+                                    <input className="border p-2 text-xs font-mono w-full" type="number" value={editingGym?.basePrice || ''} onChange={e => setEditingGym({ ...editingGym, basePrice: parseFloat(e.target.value) })} placeholder="Base Price (THB)" required />
+                                </div>
                                 <select
                                     className="border p-2 text-xs font-mono w-full"
                                     value={editingGym?.category || 'gym'}
                                     onChange={e => setEditingGym({ ...editingGym, category: e.target.value as 'gym' | 'camp' })}
                                     required
                                 >
-                                    <option value="gym">Gym</option>
-                                    <option value="camp">Camp</option>
+                                    <option value="gym">Gym Setting</option>
+                                    <option value="camp">Camp Setting (Fixed Dates)</option>
                                 </select>
+
+                                {editingGym?.category === 'camp' && (
+                                    <div className="grid grid-cols-2 gap-4 p-3 bg-brand-bone border border-brand-charcoal/20">
+                                        <div>
+                                            <label className="block text-[10px] uppercase font-bold text-gray-400 mb-1">Start Date</label>
+                                            <input type="date" className="w-full border p-2 text-xs font-mono" value={editingGym?.startDate || ''} onChange={e => setEditingGym({ ...editingGym, startDate: e.target.value })} required />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] uppercase font-bold text-gray-400 mb-1">End Date</label>
+                                            <input type="date" className="w-full border p-2 text-xs font-mono" value={editingGym?.endDate || ''} onChange={e => setEditingGym({ ...editingGym, endDate: e.target.value })} required />
+                                        </div>
+                                    </div>
+                                )}
+
                                 <input className="border p-2 text-xs font-mono w-full" value={editingGym?.location || ''} onChange={e => setEditingGym({ ...editingGym, location: e.target.value })} placeholder="Location (City, Province)" required />
+                                
+                                <div className="space-y-1">
+                                    <label className="block text-[10px] uppercase font-bold text-gray-400">Profile Image</label>
+                                    <div className="flex gap-2 items-center">
+                                        {editingGym?.profilePhoto && <img src={editingGym.profilePhoto} className="w-10 h-10 object-cover border-2 border-brand-charcoal" alt="Preview" />}
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            className="flex-1 border p-1 font-mono text-xs file:mr-2 file:border-0 file:bg-brand-charcoal file:text-white file:text-[10px] file:px-2"
+                                            onChange={async (e) => {
+                                                const file = e.target.files?.[0];
+                                                if (file) {
+                                                    try {
+                                                        const { uploadImage } = await import('../services/dataService');
+                                                        const url = await uploadImage('gyms', file);
+                                                        if (url) setEditingGym({ ...editingGym, profilePhoto: url });
+                                                    } catch (err) { alert("Upload failed"); }
+                                                }
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+
                                 <textarea className="border p-2 text-xs font-mono w-full h-24" value={editingGym?.description || ''} onChange={e => setEditingGym({ ...editingGym, description: e.target.value })} placeholder="Short description..." required />
                                 <div className="flex gap-2 pt-4">
                                     <button type="button" onClick={() => { setIsGymFormOpen(false); setEditingGym(null); }} className="flex-1 bg-gray-200 border-2 border-brand-charcoal py-2 font-black uppercase text-xs hover:bg-gray-300">Cancel</button>
@@ -275,7 +316,7 @@ const OwnerDashboard: React.FC<OwnerDashboardProps> = ({ user, gyms, updateGym, 
                                             // Make sure to reset approval status to pending if editing
                                             await updateGymDB(editingGym.id, { ...editingGym, approvalStatus: 'pending', isVerified: false });
                                             setIsGymFormOpen(false);
-                                            window.location.reload();
+                                            refreshGyms();
                                         }
                                     }}>
                                         <div className="grid grid-cols-2 gap-4">
@@ -292,6 +333,20 @@ const OwnerDashboard: React.FC<OwnerDashboardProps> = ({ user, gyms, updateGym, 
                                             <input className="border p-2 text-xs w-full" type="number" value={editingGym?.basePrice ?? ''} onChange={e => setEditingGym({ ...editingGym, basePrice: Number(e.target.value) })} placeholder="Base Price (THB)" title="Price per session" />
                                             <input className="border p-2 text-xs w-full" type="number" value={editingGym?.affiliatePercentage ?? ''} onChange={e => setEditingGym({ ...editingGym, affiliatePercentage: Number(e.target.value) })} placeholder="Affiliate Share %" title="Percentage for affiliates" />
                                         </div>
+
+                                        {editingGym?.category === 'camp' && (
+                                            <div className="grid grid-cols-2 gap-4 p-3 bg-white border">
+                                                <div>
+                                                    <label className="block text-[10px] uppercase font-bold text-gray-400 mb-1">Start Date</label>
+                                                    <input type="date" className="w-full border p-2 text-xs font-mono" value={editingGym?.startDate || ''} onChange={e => setEditingGym({ ...editingGym, startDate: e.target.value })} />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] uppercase font-bold text-gray-400 mb-1">End Date</label>
+                                                    <input type="date" className="w-full border p-2 text-xs font-mono" value={editingGym?.endDate || ''} onChange={e => setEditingGym({ ...editingGym, endDate: e.target.value })} />
+                                                </div>
+                                            </div>
+                                        )}
+
                                         <div className="grid grid-cols-1 gap-4">
                                             <input className="border p-2 text-xs w-full" value={editingGym?.location} onChange={e => setEditingGym({ ...editingGym, location: e.target.value })} placeholder="Location" />
                                             <div className="flex gap-2 items-center w-full">
@@ -336,7 +391,7 @@ const OwnerDashboard: React.FC<OwnerDashboardProps> = ({ user, gyms, updateGym, 
                                                             <button type="button" onClick={async () => {
                                                                 if (confirm('Delete trainer?')) {
                                                                     await deleteTrainer(t.id);
-                                                                    window.location.reload();
+                                                                    refreshGyms();
                                                                 }
                                                             }} className="text-red-500">Del</button>
                                                         </div>
@@ -349,7 +404,7 @@ const OwnerDashboard: React.FC<OwnerDashboardProps> = ({ user, gyms, updateGym, 
                                                 <button type="button" onClick={async () => {
                                                     if (newTrainer.name && myGym.id) {
                                                         await createTrainer({ ...newTrainer, gymId: myGym.id, pricePerSession: 500 } as any);
-                                                        window.location.reload();
+                                                        refreshGyms();
                                                     }
                                                 }} className="bg-brand-blue text-white px-2 font-bold text-xs">+</button>
                                             </div>

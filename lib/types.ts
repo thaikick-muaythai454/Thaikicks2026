@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'owner' | 'customer';
+export type UserRole = 'admin' | 'gymowner' | 'customer';
 
 export interface User {
   id: string;
@@ -10,6 +10,7 @@ export interface User {
   affiliateCode?: string;
   affiliateEarnings: number;
   affiliateStatus: 'none' | 'pending' | 'active' | 'rejected';
+  ownedGymName?: string;
 }
 
 export interface Trainer {
@@ -39,6 +40,8 @@ export interface Gym {
   bio?: string;
   socialMedia?: string;
   profilePhoto?: string;
+  startDate?: string;
+  endDate?: string;
 }
 
 export interface Booking {

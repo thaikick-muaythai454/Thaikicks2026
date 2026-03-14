@@ -44,7 +44,9 @@ export const getGyms = async (): Promise<Gym[]> => {
         approvalStatus: gym.approval_status || 'pending',
         bio: gym.bio,
         socialMedia: gym.social_media,
-        profilePhoto: gym.profile_photo
+        profilePhoto: gym.profile_photo,
+        startDate: gym.start_date,
+        endDate: gym.end_date
     })) as unknown as Gym[];
 };
 
@@ -86,7 +88,9 @@ export const getGymById = async (id: string): Promise<Gym | null> => {
         approvalStatus: data.approval_status || 'pending',
         bio: data.bio,
         socialMedia: data.social_media,
-        profilePhoto: data.profile_photo
+        profilePhoto: data.profile_photo,
+        startDate: data.start_date,
+        endDate: data.end_date
     } as unknown as Gym;
 };
 
@@ -105,7 +109,9 @@ export const createGym = async (gym: Partial<Gym>) => {
         approval_status: gym.approvalStatus || 'pending',
         bio: gym.bio || '',
         social_media: gym.socialMedia || '',
-        profile_photo: gym.profilePhoto || ''
+        profile_photo: gym.profilePhoto || '',
+        start_date: gym.startDate || null,
+        end_date: gym.endDate || null
     };
 
     const { data, error } = await supabase
@@ -132,6 +138,8 @@ export const updateGym = async (id: string, gym: Partial<Gym>) => {
     if (gym.bio !== undefined) dbGym.bio = gym.bio;
     if (gym.socialMedia !== undefined) dbGym.social_media = gym.socialMedia;
     if (gym.profilePhoto !== undefined) dbGym.profile_photo = gym.profilePhoto;
+    if (gym.startDate !== undefined) dbGym.start_date = gym.startDate;
+    if (gym.endDate !== undefined) dbGym.end_date = gym.endDate;
 
     // Safety check just in case
     if (Object.keys(dbGym).length === 0) return;
@@ -653,19 +661,27 @@ export const getAllUsers = async (): Promise<User[]> => {
         id: u.id,
         email: u.email,
         name: u.name,
-        role: u.role,
+        role: u.role === 'owner' ? 'gymowner' : u.role,
         avatar: u.avatar_url,
         isAffiliate: u.is_affiliate,
         affiliateEarnings: u.affiliate_earnings,
         affiliateStatus: u.affiliate_status,
-        affiliateCode: u.affiliate_code
+        affiliateCode: u.affiliate_code,
+        ownedGymName: u.owned_gym_name
     }));
 };
 
-export const updateUserRole = async (userId: string, role: string) => {
+export const updateUserRole = async (userId: string, role: string, gymName?: string) => {
+    // Map 'gymowner' back to 'owner' for database compatibility if needed
+    const dbRole = role === 'gymowner' ? 'owner' : role;
+    const updates: any = { role: dbRole };
+    if (gymName !== undefined) {
+        updates.owned_gym_name = gymName;
+    }
+
     const { error } = await supabase
         .from('users')
-        .update({ role })
+        .update(updates)
         .eq('id', userId);
 
     if (error) throw error;

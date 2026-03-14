@@ -3,17 +3,23 @@ import { supabase } from '../lib/supabaseClient';
 import { User } from '../lib/types';
 
 // Map Supabase User to our App User Type
-const mapUser = (sbUser: any, profile: any): User => ({
-    id: sbUser.id,
-    name: profile?.name || sbUser.email?.split('@')[0] || 'Unknown Fighter',
-    email: sbUser.email || '',
-    role: profile?.role || 'customer',
-    avatar: profile?.avatar_url || 'https://via.placeholder.com/150',
-    isAffiliate: profile?.is_affiliate || false,
-    affiliateCode: profile?.affiliate_code,
-    affiliateEarnings: profile?.affiliate_earnings || 0,
-    affiliateStatus: profile?.affiliate_status || 'none'
-});
+const mapUser = (sbUser: any, profile: any): User => {
+    let role = profile?.role || 'customer';
+    if (role === 'owner') role = 'gymowner';
+
+    return {
+        id: sbUser.id,
+        name: profile?.name || sbUser.email?.split('@')[0] || 'Unknown Fighter',
+        email: sbUser.email || '',
+        role: role as any,
+        avatar: profile?.avatar_url || 'https://via.placeholder.com/150',
+        isAffiliate: profile?.is_affiliate || false,
+        affiliateCode: profile?.affiliate_code,
+        affiliateEarnings: profile?.affiliate_earnings || 0,
+        affiliateStatus: profile?.affiliate_status || 'none',
+        ownedGymName: profile?.owned_gym_name
+    };
+};
 
 export const signUp = async (email: string, password: string, name: string) => {
     // 1. Sign up with Supabase Auth

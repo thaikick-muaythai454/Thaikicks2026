@@ -15,7 +15,7 @@ export const USERS: User[] = [
     id: 'u_owner1',
     name: 'Somchai (Tiger Gym)',
     email: 'somchai@tiger.com',
-    role: 'owner',
+    role: 'gymowner',
     avatar: 'https://picsum.photos/100/100?random=2',
     isAffiliate: false,
     affiliateEarnings: 0,

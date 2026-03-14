@@ -8,6 +8,7 @@ import Chatbot from './components/Chatbot';
 import AdminDashboard from './components/AdminDashboard';
 import OwnerDashboard from './components/OwnerDashboard'; // Import new component
 import AnalyticsDashboard from './components/AnalyticsDashboard'; // New Import
+import UserManagementPage from './components/UserManagementPage';
 import BookingPage from './components/BookingPage';
 import ResetPasswordPage from './components/ResetPasswordPage';
 import ShopAdminPage from './components/ShopAdminPage';
@@ -851,11 +852,11 @@ const App: React.FC = () => {
     };
 
     // 1. Fetch Gyms
-    const fetchGyms = async () => {
+    const loadGyms = async () => {
       const data = await getGyms();
       if (mounted) setGyms(data);
     };
-    fetchGyms();
+    loadGyms();
 
     // 2. Auth Logic (Merged)
     const handleUserUpdate = async (session: any, forceUpdate = false) => {
@@ -909,7 +910,7 @@ const App: React.FC = () => {
             setActiveUser(fullUser);
             // If Admin, fetch all applications & ALL bookings
             // If Admin OR Owner (Super User), fetch all applications & ALL bookings for now
-            if (fullUser.role === 'admin' || fullUser.role === 'owner') {
+            if (fullUser.role === 'admin' || (fullUser.role as string) === 'gymowner') {
               bookingsToShow = await getAllBookings();
               getAffiliateApplications().then(apps => {
                 if (mounted) setApplications(apps);
@@ -917,7 +918,7 @@ const App: React.FC = () => {
             }
             // Logic for specific "Gym Owner" scoped dashboard disabled temporarily as per request
             /* 
-            else if (fullUser.role === 'owner') {
+            else if (fullUser.role === 'gymowner') {
                const latestGyms = await getGyms();
                const myGym = latestGyms.find(g => g.ownerId === fullUser.id);
                if (myGym) {
@@ -1049,14 +1050,15 @@ const App: React.FC = () => {
             <Route path="/camps" element={<HomePage user={activeUser} gyms={gyms} setBookings={setBookings} categoryFilter="camp" heroImages={heroImages} currentHeroIndex={currentHeroIndex} />} />
             <Route path="/booking/:gymId" element={<BookingPage gyms={gyms} user={activeUser} setBookings={setBookings} />} />
             <Route path="/dashboard" element={activeUser?.role === 'customer' ? <CustomerDashboard user={activeUser} bookings={bookings} requestAffiliate={handleAffiliateRequest} /> : <HomePage user={activeUser} gyms={gyms} setBookings={setBookings} heroImages={heroImages} currentHeroIndex={currentHeroIndex} />} />
-            <Route path="/owner" element={activeUser?.role === 'owner' ? <OwnerDashboard user={activeUser} gyms={gyms} updateGym={handleUpdateGym} bookings={bookings} /> : <HomePage user={activeUser} gyms={gyms} setBookings={setBookings} heroImages={heroImages} currentHeroIndex={currentHeroIndex} />} />
-            <Route path="/admin" element={activeUser?.role === 'admin' ? <AdminDashboard bookings={bookings} applications={applications} handleApprove={handleAffiliateApproval} /> : <HomePage user={activeUser} gyms={gyms} setBookings={setBookings} heroImages={heroImages} currentHeroIndex={currentHeroIndex} />} />
-            <Route path="/analytics" element={(activeUser?.role === 'admin' || activeUser?.role === 'owner') ? <AnalyticsDashboard bookings={bookings} /> : <HomePage user={activeUser} gyms={gyms} setBookings={setBookings} heroImages={heroImages} currentHeroIndex={currentHeroIndex} />} />
+            <Route path="/owner" element={(activeUser?.role as string) === 'gymowner' ? <OwnerDashboard user={activeUser} gyms={gyms} updateGym={handleUpdateGym} refreshGyms={() => getGyms().then(setGyms)} bookings={bookings} /> : <HomePage user={activeUser} gyms={gyms} setBookings={setBookings} heroImages={heroImages} currentHeroIndex={currentHeroIndex} />} />
+            <Route path="/admin" element={activeUser?.role === 'admin' ? <AdminDashboard gyms={gyms} setGyms={setGyms} bookings={bookings} applications={applications} handleApprove={handleAffiliateApproval} /> : <HomePage user={activeUser} gyms={gyms} setBookings={setBookings} heroImages={heroImages} currentHeroIndex={currentHeroIndex} />} />
+            <Route path="/admin/users" element={activeUser?.role === 'admin' ? <UserManagementPage /> : <HomePage user={activeUser} gyms={gyms} setBookings={setBookings} heroImages={heroImages} currentHeroIndex={currentHeroIndex} />} />
+            <Route path="/analytics" element={(activeUser?.role === 'admin' || (activeUser?.role as string) === 'gymowner') ? <AnalyticsDashboard bookings={bookings} /> : <HomePage user={activeUser} gyms={gyms} setBookings={setBookings} heroImages={heroImages} currentHeroIndex={currentHeroIndex} />} />
             <Route path="/shop" element={<ShopPage user={activeUser} />} />
             <Route path="/tickets" element={<TicketingPage user={activeUser} />} />
             <Route path="/checkout" element={<CheckoutPage user={activeUser} />} />
             <Route path="/checkout-success" element={<CheckoutSuccessPage />} />
-            <Route path="/shop-admin" element={(activeUser?.role === 'admin' || activeUser?.role === 'owner') ? <ShopAdminPage /> : <HomePage user={activeUser} gyms={gyms} setBookings={setBookings} />} />
+            <Route path="/shop-admin" element={activeUser?.role === 'admin' ? <ShopAdminPage /> : <HomePage user={activeUser} gyms={gyms} setBookings={setBookings} />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
 
             {/* Legal Pages */}
