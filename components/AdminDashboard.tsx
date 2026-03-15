@@ -751,7 +751,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ gyms, setGyms, bookings
                   <option value="gym">Gym</option>
                   <option value="camp">Camp</option>
                 </select>
-                <input type="number" className="border-2 border-brand-charcoal p-4 font-mono text-sm" placeholder="PRICE (THB)" value={editingGym?.basePrice || ''} onChange={e => setEditingGym({...editingGym, basePrice: parseFloat(e.target.value)})} />
+                <input type="number" className="border-2 border-brand-charcoal p-4 font-mono text-sm" placeholder={editingGym?.category === 'camp' ? "CAMP PRICE (TOTAL)" : "PRICE (THB)"} value={editingGym?.basePrice || ''} onChange={e => setEditingGym({...editingGym, basePrice: parseFloat(e.target.value)})} />
                 <input type="number" className="border-2 border-brand-charcoal p-4 font-mono text-sm" placeholder="AFFILIATE %" value={editingGym?.affiliatePercentage || ''} onChange={e => setEditingGym({...editingGym, affiliatePercentage: parseFloat(e.target.value)})} title="Commission for affiliates" />
               </div>
 

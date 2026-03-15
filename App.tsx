@@ -87,7 +87,7 @@ const GymCard: React.FC<{ gym: Gym; onBook: () => void; isLarge?: boolean }> = (
     {/* Info Container */}
     <div className="p-8 relative">
       <div className="absolute -top-5 right-8 bg-brand-blue text-white font-mono font-bold px-6 py-3 text-sm shadow-sm">
-        ฿{gym.basePrice} / DAY
+        ฿{gym.basePrice} {gym.category === 'camp' ? '/ TOTAL' : '/ DAY'}
       </div>
 
       <Mono className="text-gray-500 block mb-2">{gym.location}</Mono>
@@ -175,7 +175,7 @@ const HomePage: React.FC<{
           <div>
             <Mono className="text-brand-red block mb-6">Bangkok • Phuket • Chiang Mai</Mono>
             <h1 className="text-[clamp(3.5rem,8vw,8rem)] font-black text-brand-charcoal leading-[0.9] tracking-tight">
-              {categoryFilter === 'gym' ? 'ELITE GYMS' : categoryFilter === 'camp' ? 'AUTHENTIC CAMPS' : 'FORGE YOUR'}<br />
+              {categoryFilter === 'gym' ? 'ELITE GYMS ' : categoryFilter === 'camp' ? 'AUTHENTIC CAMPS ' : 'FORGE YOUR'}<br />
               <span className="text-brand-red">{categoryFilter ? 'SELECTION' : 'LEGACY.'}</span>
             </h1>
             <div className="flex flex-col sm:flex-row gap-4 mt-8">
@@ -456,7 +456,7 @@ const ShopOrdersSection: React.FC<{ userId: string }> = ({ userId }) => {
   );
 };
 
-const CustomerDashboard: React.FC<{ user: User; bookings: Booking[]; requestAffiliate: () => void }> = ({ user, bookings, requestAffiliate }) => {
+const CustomerDashboard: React.FC<{ user: User; bookings: Booking[]; requestAffiliate: () => void; onUpdateUser: (user: User) => void }> = ({ user, bookings, requestAffiliate, onUpdateUser }) => {
   const [isEditingProfile, setIsEditingProfile] = React.useState(false);
   const [editName, setEditName] = React.useState(user.name);
   const [editAvatar, setEditAvatar] = React.useState(user.avatar || '');
@@ -502,6 +502,7 @@ const CustomerDashboard: React.FC<{ user: User; bookings: Booking[]; requestAffi
       }
 
       await updateUserProfile(user.id, { name: editName, avatar_url: finalAvatarUrl });
+      onUpdateUser({ ...user, name: editName, avatar: finalAvatarUrl }); // Update local state immediately
       setIsEditingProfile(false);
       setAvatarFile(null);
       alert('Profile updated successfully!');
@@ -1049,7 +1050,7 @@ const App: React.FC = () => {
             <Route path="/gyms" element={<HomePage user={activeUser} gyms={gyms} setBookings={setBookings} categoryFilter="gym" heroImages={heroImages} currentHeroIndex={currentHeroIndex} />} />
             <Route path="/camps" element={<HomePage user={activeUser} gyms={gyms} setBookings={setBookings} categoryFilter="camp" heroImages={heroImages} currentHeroIndex={currentHeroIndex} />} />
             <Route path="/booking/:gymId" element={<BookingPage gyms={gyms} user={activeUser} setBookings={setBookings} />} />
-            <Route path="/dashboard" element={activeUser?.role === 'customer' ? <CustomerDashboard user={activeUser} bookings={bookings} requestAffiliate={handleAffiliateRequest} /> : <HomePage user={activeUser} gyms={gyms} setBookings={setBookings} heroImages={heroImages} currentHeroIndex={currentHeroIndex} />} />
+            <Route path="/dashboard" element={activeUser?.role === 'customer' ? <CustomerDashboard user={activeUser} bookings={bookings} requestAffiliate={handleAffiliateRequest} onUpdateUser={setActiveUser} /> : <HomePage user={activeUser} gyms={gyms} setBookings={setBookings} heroImages={heroImages} currentHeroIndex={currentHeroIndex} />} />
             <Route path="/owner" element={(activeUser?.role as string) === 'gymowner' ? <OwnerDashboard user={activeUser} gyms={gyms} updateGym={handleUpdateGym} refreshGyms={() => getGyms().then(setGyms)} bookings={bookings} /> : <HomePage user={activeUser} gyms={gyms} setBookings={setBookings} heroImages={heroImages} currentHeroIndex={currentHeroIndex} />} />
             <Route path="/admin" element={activeUser?.role === 'admin' ? <AdminDashboard gyms={gyms} setGyms={setGyms} bookings={bookings} applications={applications} handleApprove={handleAffiliateApproval} /> : <HomePage user={activeUser} gyms={gyms} setBookings={setBookings} heroImages={heroImages} currentHeroIndex={currentHeroIndex} />} />
             <Route path="/admin/users" element={activeUser?.role === 'admin' ? <UserManagementPage /> : <HomePage user={activeUser} gyms={gyms} setBookings={setBookings} heroImages={heroImages} currentHeroIndex={currentHeroIndex} />} />

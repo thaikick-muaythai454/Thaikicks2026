@@ -117,7 +117,7 @@ const OwnerDashboard: React.FC<OwnerDashboardProps> = ({ user, gyms, updateGym, 
                             }}>
                                 <div className="grid grid-cols-2 gap-4">
                                     <input className="border p-2 text-xs font-mono w-full" value={editingGym?.name || ''} onChange={e => setEditingGym({ ...editingGym, name: e.target.value })} placeholder="Gym / Camp Name" required />
-                                    <input className="border p-2 text-xs font-mono w-full" type="number" value={editingGym?.basePrice || ''} onChange={e => setEditingGym({ ...editingGym, basePrice: parseFloat(e.target.value) })} placeholder="Base Price (THB)" required />
+                                    <input className="border p-2 text-xs font-mono w-full" type="number" value={editingGym?.basePrice || ''} onChange={e => setEditingGym({ ...editingGym, basePrice: parseFloat(e.target.value) })} placeholder={editingGym?.category === 'camp' ? "Camp Package Price (THB)" : "Base Price (THB)"} required />
                                 </div>
                                 <select
                                     className="border p-2 text-xs font-mono w-full"
@@ -330,7 +330,7 @@ const OwnerDashboard: React.FC<OwnerDashboardProps> = ({ user, gyms, updateGym, 
                                                 <option value="gym">Gym</option>
                                                 <option value="camp">Camp</option>
                                             </select>
-                                            <input className="border p-2 text-xs w-full" type="number" value={editingGym?.basePrice ?? ''} onChange={e => setEditingGym({ ...editingGym, basePrice: Number(e.target.value) })} placeholder="Base Price (THB)" title="Price per session" />
+                                            <input className="border p-2 text-xs w-full" type="number" value={editingGym?.basePrice ?? ''} onChange={e => setEditingGym({ ...editingGym, basePrice: Number(e.target.value) })} placeholder={editingGym?.category === 'camp' ? "Camp Total Price" : "Base Price (THB)"} title={editingGym?.category === 'camp' ? "Total package price" : "Price per session"} />
                                             <input className="border p-2 text-xs w-full" type="number" value={editingGym?.affiliatePercentage ?? ''} onChange={e => setEditingGym({ ...editingGym, affiliatePercentage: Number(e.target.value) })} placeholder="Affiliate Share %" title="Percentage for affiliates" />
                                         </div>
 

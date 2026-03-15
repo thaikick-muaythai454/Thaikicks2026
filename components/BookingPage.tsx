@@ -173,6 +173,12 @@ const BookingPage: React.FC<BookingPageProps> = ({ gyms, user, setBookings }) =>
 
         let oneSessionPrice = gym.basePrice;
         if (gym.isFlashSale) oneSessionPrice = oneSessionPrice * (1 - gym.flashSaleDiscount / 100);
+
+        // If it's a camp and standard booking, it's a flat rate
+        if (type === 'standard' && gym.category === 'camp') {
+            return Math.round(oneSessionPrice);
+        }
+
         if (type === 'private' && selectedTrainer) oneSessionPrice += selectedTrainer.pricePerSession;
 
         const count = calculateSessionCount();
@@ -252,6 +258,12 @@ const BookingPage: React.FC<BookingPageProps> = ({ gyms, user, setBookings }) =>
             }
 
             const createdBookings = await Promise.all(bookingPromises);
+
+            // Sync with App state immediately
+            if (setBookings) {
+                const flattened = createdBookings.flat();
+                setBookings(prev => [...prev, ...flattened]);
+            }
 
             // For checkout, we use the ID of the first created booking to represent the session
             mainBookingId = createdBookings[0][0]?.id; // Assuming createBooking returns array of inserted 
@@ -341,7 +353,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ gyms, user, setBookings }) =>
                                     <label className="font-mono text-xs font-bold text-brand-blue block">01 // SELECT EXPERIENCE</label>
                                     <div className="flex gap-2 w-full">
                                         <button onClick={() => setType('standard')} className={`flex-1 p-3 border-2 font-mono text-[10px] md:text-xs font-bold uppercase transition-all ${type === 'standard' ? 'border-brand-charcoal bg-brand-charcoal text-white shadow-[4px_4px_0px_0px_#3471AE]' : 'border-gray-200 text-gray-400 hover:border-brand-blue'}`}>
-                                            Daily
+                                            {gym.category === 'camp' ? 'Camp' : 'Daily'}
                                         </button>
                                         {gym.trainers.length > 0 && (
                                             <button onClick={() => setType('private')} className={`flex-1 p-3 border-2 font-mono text-[10px] md:text-xs font-bold uppercase transition-all ${type === 'private' ? 'border-brand-charcoal bg-brand-charcoal text-white shadow-[4px_4px_0px_0px_#3471AE]' : 'border-gray-200 text-gray-400 hover:border-brand-blue'}`}>
