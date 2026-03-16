@@ -120,3 +120,23 @@ export const updateUserPassword = async (password: string) => {
     const { error } = await supabase.auth.updateUser({ password });
     if (error) throw error;
 };
+
+export const requestDataDeletion = async (userId: string) => {
+    // 1. Log the deletion request
+    // For now, we'll mark the user as 'DELETED' in public.users 
+    // and the admin can handle the full Auth deletion from Supabase Dashboard.
+    const { error } = await supabase
+        .from('users')
+        .update({
+            name: 'DELETED USER',
+            affiliate_status: 'none',
+            role: 'customer'
+        })
+        .eq('id', userId);
+
+    if (error) throw error;
+
+    // 2. Sign the user out
+    const { error: signOutError } = await supabase.auth.signOut();
+    if (signOutError) throw signOutError;
+};

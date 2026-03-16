@@ -604,6 +604,25 @@ const CustomerDashboard: React.FC<{ user: User; bookings: Booking[]; requestAffi
                           </div>
                         </div>
                       </div>
+                      
+                      <div className="pt-2">
+                        <button 
+                          onClick={async () => {
+                            if (window.confirm("ARE YOU SURE? This will permanently request the deletion of your account and all training data. This action cannot be undone.")) {
+                              try {
+                                const { requestDataDeletion } = await import('./services/authService');
+                                await requestDataDeletion(user.id);
+                                window.location.href = '/';
+                              } catch (err) {
+                                alert("Failed to request deletion. Please contact support.");
+                              }
+                            }
+                          }}
+                          className="text-[10px] font-mono text-gray-400 hover:text-brand-red uppercase underline"
+                        >
+                          Request Account Deletion
+                        </button>
+                      </div>
                     </div>
                   </div>
                   <button
