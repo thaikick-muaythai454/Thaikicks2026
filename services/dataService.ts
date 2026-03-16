@@ -649,6 +649,7 @@ export const getAllUsers = async (): Promise<User[]> => {
     const { data, error } = await supabase
         .from('users')
         .select('*')
+        .is('deleted_at', null)
         .order('created_at', { ascending: false });
 
     if (error) {
@@ -691,6 +692,16 @@ export const updateUserProfile = async (userId: string, data: { name?: string, a
     const { error } = await supabase
         .from('users')
         .update(data)
+        .eq('id', userId);
+
+    if (error) throw error;
+};
+
+export const deleteUser = async (userId: string) => {
+    // Perform Soft Delete
+    const { error } = await supabase
+        .from('users')
+        .update({ deleted_at: new Date().toISOString() })
         .eq('id', userId);
 
     if (error) throw error;

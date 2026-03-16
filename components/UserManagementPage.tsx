@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, UserRole } from '../lib/types';
-import { getAllUsers, updateUserRole } from '../services/dataService';
-import { Shield, Search, ArrowLeft, Check, AlertCircle } from 'lucide-react';
+import { getAllUsers, updateUserRole, deleteUser } from '../services/dataService';
+import { Shield, Search, ArrowLeft, Check, AlertCircle, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const Mono: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = "" }) => (
@@ -66,6 +66,24 @@ const UserManagementPage: React.FC = () => {
     }
   };
 
+  const handleDelete = async (userId: string, userName: string) => {
+    if (!window.confirm(`ARE YOU SURE? This will permanently remove ${userName} from the public registry. This action cannot be reversed.`)) {
+      return;
+    }
+
+    setUpdatingId(userId);
+    setError(null);
+    try {
+      await deleteUser(userId);
+      setUsers(prev => prev.filter(u => u.id !== userId));
+    } catch (err) {
+      console.error(err);
+      setError('Deletion failed. The user might have active bookings or dependencies.');
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
   const filteredUsers = users.filter(u =>
     u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     u.email.toLowerCase().includes(searchTerm.toLowerCase())
@@ -121,7 +139,8 @@ const UserManagementPage: React.FC = () => {
                 <th className="p-6">Identity</th>
                 <th className="p-6">Unique ID</th>
                 <th className="p-6">Access Level</th>
-                <th className="p-6 text-right">Affiliate Status</th>
+                <th className="p-6">Affiliate Status</th>
+                <th className="p-6 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="font-mono text-xs">
@@ -197,6 +216,17 @@ const UserManagementPage: React.FC = () => {
                         <div className="text-[9px] font-mono text-gray-400 mt-1 uppercase">CODE: {user.affiliateCode}</div>
                       )}
                     </div>
+                  </td>
+
+                  <td className="p-6 text-right">
+                    <button
+                      onClick={() => handleDelete(user.id, user.name)}
+                      disabled={updatingId === user.id}
+                      className="text-gray-400 hover:text-brand-red transition-colors p-2 disabled:opacity-30"
+                      title="Delete User Record"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </td>
                 </tr>
               )) : (

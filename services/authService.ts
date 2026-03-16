@@ -98,7 +98,11 @@ export const getCurrentUser = async (): Promise<User | null> => {
         .eq('id', session.user.id)
         .single();
 
-    if (error) {
+    if (error || profile.deleted_at) {
+        if (!error && profile.deleted_at) {
+            await signOut();
+            return null;
+        }
         console.warn('Profile not found for auth user:', session.user.id);
         // Return basic user info from Auth if profile missing (fallback)
         return mapUser(session.user, null);
@@ -130,7 +134,8 @@ export const requestDataDeletion = async (userId: string) => {
         .update({
             name: 'DELETED USER',
             affiliate_status: 'none',
-            role: 'customer'
+            role: 'customer',
+            deleted_at: new Date().toISOString()
         })
         .eq('id', userId);
 
