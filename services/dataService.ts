@@ -46,7 +46,9 @@ export const getGyms = async (): Promise<Gym[]> => {
         socialMedia: gym.social_media,
         profilePhoto: gym.profile_photo,
         startDate: gym.start_date,
-        endDate: gym.end_date
+        endDate: gym.end_date,
+        googleMapsUrl: gym.google_maps_url,
+        facilities: gym.facilities
     })) as unknown as Gym[];
 };
 
@@ -90,7 +92,9 @@ export const getGymById = async (id: string): Promise<Gym | null> => {
         socialMedia: data.social_media,
         profilePhoto: data.profile_photo,
         startDate: data.start_date,
-        endDate: data.end_date
+        endDate: data.end_date,
+        googleMapsUrl: data.google_maps_url,
+        facilities: data.facilities
     } as unknown as Gym;
 };
 
@@ -111,7 +115,9 @@ export const createGym = async (gym: Partial<Gym>) => {
         social_media: gym.socialMedia || '',
         profile_photo: gym.profilePhoto || '',
         start_date: gym.startDate || null,
-        end_date: gym.endDate || null
+        end_date: gym.endDate || null,
+        google_maps_url: gym.googleMapsUrl || null,
+        facilities: gym.facilities || {}
     };
 
     const { data, error } = await supabase
@@ -140,6 +146,8 @@ export const updateGym = async (id: string, gym: Partial<Gym>) => {
     if (gym.profilePhoto !== undefined) dbGym.profile_photo = gym.profilePhoto;
     if (gym.startDate !== undefined) dbGym.start_date = gym.startDate;
     if (gym.endDate !== undefined) dbGym.end_date = gym.endDate;
+    if (gym.googleMapsUrl !== undefined) dbGym.google_maps_url = gym.googleMapsUrl;
+    if (gym.facilities !== undefined) dbGym.facilities = gym.facilities;
 
     // Safety check just in case
     if (Object.keys(dbGym).length === 0) return;

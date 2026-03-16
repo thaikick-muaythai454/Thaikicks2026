@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { ShoppingBag, ShoppingCart, Plus, Minus, X } from 'lucide-react';
 import { Product, CartItem, User } from '../lib/types';
 import { getProducts } from '../services/shopService';
@@ -16,6 +16,8 @@ const ShopPage: React.FC<ShopPageProps> = ({ user }) => {
     const [isCartOpen, setIsCartOpen] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState<string>('all');
     const [isAuthOpen, setIsAuthOpen] = useState(false);
+    const location = useLocation();
+    const [isCartLoaded, setIsCartLoaded] = useState(false);
 
     useEffect(() => {
         loadProducts();
@@ -23,9 +25,19 @@ const ShopPage: React.FC<ShopPageProps> = ({ user }) => {
     }, []);
 
     useEffect(() => {
-        // Save cart to localStorage whenever it changes
-        localStorage.setItem('thaikick_cart', JSON.stringify(cart));
-    }, [cart]);
+        if (location.state?.openCart) {
+            setIsCartOpen(true);
+            // Clear the state so it doesn't reopen on refresh
+            window.history.replaceState({ ...window.history.state, usr: {} }, document.title);
+        }
+    }, [location.state]);
+
+    useEffect(() => {
+        // Save cart to localStorage whenever it changes, but only after initial load
+        if (isCartLoaded) {
+            localStorage.setItem('thaikick_cart', JSON.stringify(cart));
+        }
+    }, [cart, isCartLoaded]);
 
     const loadProducts = async () => {
         const data = await getProducts();
@@ -41,6 +53,7 @@ const ShopPage: React.FC<ShopPageProps> = ({ user }) => {
                 console.error('Failed to load cart', e);
             }
         }
+        setIsCartLoaded(true);
     };
 
     const categories = ['all', ...Array.from(new Set(products.map(p => p.category)))];
@@ -141,27 +154,34 @@ const ShopPage: React.FC<ShopPageProps> = ({ user }) => {
                         {filteredProducts.map((product, index) => (
                             <div
                                 key={product.id}
-                                className="bg-white border-2 border-brand-charcoal group hover:shadow-[8px_8px_0px_0px_#1A1A1A] transition-all animate-reveal"
+                                className="bg-white border-2 border-brand-charcoal group hover:shadow-[8px_8px_0px_0px_#1A1A1A] transition-all animate-reveal flex flex-col"
                                 style={{ animationDelay: `${index * 0.05}s` }}
                             >
-                                {product.imageUrl && (
-                                    <div className="aspect-square overflow-hidden border-b-2 border-brand-charcoal">
-                                        <img
-                                            src={product.imageUrl}
-                                            alt={product.name}
-                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                                        />
+                                <div 
+                                    className="cursor-pointer"
+                                    onClick={() => navigate(`/shop/${product.id}`)}
+                                >
+                                    {product.imageUrl && (
+                                        <div className="aspect-square overflow-hidden border-b-2 border-brand-charcoal">
+                                            <img
+                                                src={product.imageUrl}
+                                                alt={product.name}
+                                                className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                            />
+                                        </div>
+                                    )}
+                                    <div className="p-4 flex-grow">
+                                        <div className="flex items-start justify-between mb-2">
+                                            <h3 className="font-black uppercase text-sm text-brand-charcoal group-hover:text-brand-blue transition-colors">{product.name}</h3>
+                                            {product.isFeatured && (
+                                                <span className="bg-brand-red text-white px-2 py-0.5 text-[10px] font-bold uppercase shrink-0">Hot</span>
+                                            )}
+                                        </div>
+                                        <p className="font-mono text-xs text-gray-500 mb-3 line-clamp-2">{product.description}</p>
                                     </div>
-                                )}
-                                <div className="p-4">
-                                    <div className="flex items-start justify-between mb-2">
-                                        <h3 className="font-black uppercase text-sm text-brand-charcoal">{product.name}</h3>
-                                        {product.isFeatured && (
-                                            <span className="bg-brand-red text-white px-2 py-0.5 text-[10px] font-bold uppercase">Hot</span>
-                                        )}
-                                    </div>
-                                    <p className="font-mono text-xs text-gray-500 mb-3 line-clamp-2">{product.description}</p>
-                                    <div className="flex items-center justify-between">
+                                </div>
+                                <div className="p-4 pt-0 mt-auto">
+                                    <div className="flex items-center justify-between border-t border-gray-100 pt-4 mt-2">
                                         <div>
                                             <div className="text-2xl font-black text-brand-charcoal">฿{product.price.toLocaleString()}</div>
                                             <div className={`font-mono text-[10px] uppercase mt-1 ${product.stockStatus === 'in_stock' ? 'text-green-600' :
@@ -172,7 +192,10 @@ const ShopPage: React.FC<ShopPageProps> = ({ user }) => {
                                             </div>
                                         </div>
                                         <button
-                                            onClick={() => addToCart(product)}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                addToCart(product);
+                                            }}
                                             className="bg-brand-charcoal text-white p-3 hover:bg-brand-blue transition-colors"
                                         >
                                             <Plus className="w-4 h-4" />

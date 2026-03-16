@@ -13,6 +13,7 @@ import BookingPage from './components/BookingPage';
 import ResetPasswordPage from './components/ResetPasswordPage';
 import ShopAdminPage from './components/ShopAdminPage';
 import ShopPage from './components/ShopPage';
+import ProductDetailsPage from './components/ProductDetailsPage';
 import CheckoutPage from './components/CheckoutPage';
 import CheckoutSuccessPage from './components/CheckoutSuccessPage';
 import TicketingPage from './components/TicketingPage';
@@ -1075,6 +1076,7 @@ const App: React.FC = () => {
             <Route path="/admin/users" element={activeUser?.role === 'admin' ? <UserManagementPage /> : <HomePage user={activeUser} gyms={gyms} setBookings={setBookings} heroImages={heroImages} currentHeroIndex={currentHeroIndex} />} />
             <Route path="/analytics" element={(activeUser?.role === 'admin' || (activeUser?.role as string) === 'gymowner') ? <AnalyticsDashboard bookings={bookings} /> : <HomePage user={activeUser} gyms={gyms} setBookings={setBookings} heroImages={heroImages} currentHeroIndex={currentHeroIndex} />} />
             <Route path="/shop" element={<ShopPage user={activeUser} />} />
+            <Route path="/shop/:id" element={<ProductDetailsPage user={activeUser} />} />
             <Route path="/tickets" element={<TicketingPage user={activeUser} />} />
             <Route path="/checkout" element={<CheckoutPage user={activeUser} />} />
             <Route path="/checkout-success" element={<CheckoutSuccessPage />} />

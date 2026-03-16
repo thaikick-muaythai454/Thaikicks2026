@@ -24,8 +24,39 @@ export const getProducts = async (): Promise<Product[]> => {
         imageUrl: p.image_url,
         stockStatus: p.stock_status,
         isFeatured: p.is_featured,
-        createdAt: p.created_at
+        createdAt: p.created_at,
+        sizes: p.sizes,
+        colors: p.colors,
+        stockQuantity: p.stock_quantity
     }));
+};
+
+export const getProductById = async (id: string): Promise<Product | null> => {
+    const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+    if (error) {
+        console.error('Error fetching product:', error);
+        return null;
+    }
+
+    return {
+        id: data.id,
+        name: data.name,
+        description: data.description,
+        price: data.price,
+        category: data.category,
+        imageUrl: data.image_url,
+        stockStatus: data.stock_status,
+        isFeatured: data.is_featured,
+        createdAt: data.created_at,
+        sizes: data.sizes,
+        colors: data.colors,
+        stockQuantity: data.stock_quantity
+    };
 };
 
 export const createProduct = async (product: Omit<Product, 'id' | 'createdAt'>) => {
@@ -36,7 +67,10 @@ export const createProduct = async (product: Omit<Product, 'id' | 'createdAt'>) 
         category: product.category,
         image_url: product.imageUrl,
         stock_status: product.stockStatus,
-        is_featured: product.isFeatured
+        is_featured: product.isFeatured,
+        sizes: product.sizes,
+        colors: product.colors,
+        stock_quantity: product.stockQuantity
     };
 
     const { data, error } = await supabase
@@ -58,6 +92,9 @@ export const updateProduct = async (id: string, product: Partial<Product>) => {
     if (product.imageUrl !== undefined) dbProduct.image_url = product.imageUrl;
     if (product.stockStatus) dbProduct.stock_status = product.stockStatus;
     if (product.isFeatured !== undefined) dbProduct.is_featured = product.isFeatured;
+    if (product.sizes !== undefined) dbProduct.sizes = product.sizes;
+    if (product.colors !== undefined) dbProduct.colors = product.colors;
+    if (product.stockQuantity !== undefined) dbProduct.stock_quantity = product.stockQuantity;
 
     const { data, error } = await supabase
         .from('products')

@@ -42,6 +42,8 @@ export interface Gym {
   profilePhoto?: string;
   startDate?: string;
   endDate?: string;
+  googleMapsUrl?: string;
+  facilities?: Record<string, boolean>;
 }
 
 export interface Booking {
@@ -114,10 +116,15 @@ export interface Product {
   stockStatus: 'in_stock' | 'low_stock' | 'out_of_stock' | 'pre_order';
   isFeatured: boolean;
   createdAt?: string;
+  sizes?: string[];
+  colors?: string[];
+  stockQuantity?: number;
 }
 
 export interface CartItem extends Product {
   quantity: number;
+  selectedSize?: string;
+  selectedColor?: string;
 }
 
 export interface ShopOrder {

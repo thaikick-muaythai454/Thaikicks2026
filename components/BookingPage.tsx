@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Check, Shield, Lock, CreditCard, Tag, Sparkles } from 'lucide-react';
+import { ArrowLeft, Check, Shield, Lock, CreditCard, Tag, Sparkles, MapPin, Wind, Droplets, Wifi, Briefcase, Target, Crosshair, Box, Dumbbell, Save, Edit2 } from 'lucide-react';
 import { Gym, User, Booking, Trainer, TrainerSchedule, Course } from '../lib/types';
 import { getReferralCode } from '../lib/affiliate';
-import { createBooking, getTrainerSchedules, getTrainerBookings, getCourses, validateAffiliateCode, getSystemSetting, createBookingCheckoutSession } from '../services/dataService';
+import { createBooking, getTrainerSchedules, getTrainerBookings, getCourses, validateAffiliateCode, getSystemSetting, createBookingCheckoutSession, updateGym } from '../services/dataService';
 import generatePayload from 'promptpay-qr';
 import { QRCodeSVG } from 'qrcode.react';
 import { PROMPTPAY_NUMBER } from '../lib/constants';
@@ -24,6 +24,11 @@ const BookingPage: React.FC<BookingPageProps> = ({ gyms, user, setBookings }) =>
     const { gymId } = useParams<{ gymId: string }>();
     const navigate = useNavigate();
     const [gym, setGym] = useState<Gym | null>(null);
+
+    // Profile Edit State
+    const [isEditMode, setIsEditMode] = useState(false);
+    const [editMapsUrl, setEditMapsUrl] = useState('');
+    const [editFacilities, setEditFacilities] = useState<Record<string, boolean>>({});
 
     // Booking State
     const [step, setStep] = useState<'booking' | 'payment'>('booking');
@@ -62,6 +67,33 @@ const BookingPage: React.FC<BookingPageProps> = ({ gyms, user, setBookings }) =>
     const getDayName = (dateStr: string) => {
         const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
         return days[new Date(dateStr).getDay()];
+    };
+
+    const getMapEmbedSrc = (url: string, gymName: string, gymLocation: string) => {
+        if (!url) return '';
+        // Handle copied iframe HTML
+        if (url.includes('<iframe')) {
+            return (url.match(/src="([^"]+)"/) || [])[1] || url;
+        }
+        // Handle valid embed URLs
+        if (url.includes('google.com/maps/embed')) {
+            return url;
+        }
+        // Try to extract place name from google.com/maps/place/...
+        const placeMatch = url.match(/\/place\/([^\/]+)/);
+        if (placeMatch && placeMatch[1]) {
+            let placeName = decodeURIComponent(placeMatch[1].replace(/\+/g, ' '));
+            // Remove coordinate strings if they accidentally got mashed in
+            placeName = placeName.split('/@')[0]; 
+            return `https://maps.google.com/maps?q=${encodeURIComponent(placeName)}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
+        }
+        // Try to extract coordinates @lat,lng
+        const coordMatch = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+        if (coordMatch) {
+             return `https://maps.google.com/maps?q=${coordMatch[1]},${coordMatch[2]}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
+        }
+        // Fallback to gym name + location
+        return `https://maps.google.com/maps?q=${encodeURIComponent(gymName + ' ' + gymLocation)}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
     };
 
     const calculateSessionCount = () => {
@@ -124,6 +156,8 @@ const BookingPage: React.FC<BookingPageProps> = ({ gyms, user, setBookings }) =>
         const foundGym = gyms.find(g => g.id === gymId);
         if (foundGym && (foundGym.isVerified || foundGym.approvalStatus === 'approved')) {
             setGym(foundGym);
+            setEditMapsUrl(foundGym.googleMapsUrl || '');
+            setEditFacilities(foundGym.facilities || {});
             // Auto-fill dates for Camps
             if (foundGym.category === 'camp' && foundGym.startDate) {
                 setStartDate(foundGym.startDate);
@@ -183,6 +217,25 @@ const BookingPage: React.FC<BookingPageProps> = ({ gyms, user, setBookings }) =>
 
         const count = calculateSessionCount();
         return Math.round(oneSessionPrice * count);
+    };
+
+    const handleSaveProfile = async () => {
+        if (!gym) return;
+        setIsProcessing(true);
+        try {
+            await updateGym(gym.id, {
+                googleMapsUrl: editMapsUrl,
+                facilities: editFacilities
+            });
+            setGym({ ...gym, googleMapsUrl: editMapsUrl, facilities: editFacilities });
+            setIsEditMode(false);
+            alert("Profile updated successfully!");
+        } catch (error) {
+            console.error("Failed to update profile", error);
+            alert("Failed to update profile.");
+        } finally {
+            setIsProcessing(false);
+        }
     };
 
     const handleProceedToPayment = () => {
@@ -310,29 +363,163 @@ const BookingPage: React.FC<BookingPageProps> = ({ gyms, user, setBookings }) =>
     return (
         <div className="min-h-screen bg-brand-bone animate-reveal">
             <div className="max-w-[1440px] mx-auto grid grid-cols-1 lg:grid-cols-2 min-h-screen">
-                <div className="relative h-[300px] lg:h-auto bg-gray-900 border-r-2 border-brand-charcoal order-1 lg:order-none">
-                    <img
-                        src={gym.images?.[0] || gym.profilePhoto || 'https://via.placeholder.com/600x400?text=No+Image'}
-                        alt={gym.name}
-                        className="w-full h-full object-cover opacity-60 grayscale mix-blend-luminosity"
-                    />
-                    <div className="absolute inset-0 p-8 lg:p-16 flex flex-col justify-between">
-                        <Link to="/" className="inline-flex items-center gap-2 text-white font-mono text-xs font-bold uppercase hover:text-brand-red transition-colors w-fit">
-                            <ArrowLeft className="w-4 h-4" /> Return
-                        </Link>
-                        <div>
-                            <div className="inline-block bg-brand-blue text-white font-mono text-xs font-bold px-3 py-1 mb-4 uppercase">
-                                {gym.location}
+                <div className="relative flex flex-col lg:h-auto bg-gray-900 border-r-2 border-brand-charcoal order-1 lg:order-none lg:overflow-y-auto" style={{ maxHeight: '100vh' }}>
+                    {/* Header Background */}
+                    <div className="relative flex-shrink-0 min-h-[300px] lg:min-h-[500px] flex flex-col">
+                        <img
+                            src={gym.images?.[0] || gym.profilePhoto || 'https://via.placeholder.com/600x400?text=No+Image'}
+                            alt={gym.name}
+                            className="absolute inset-0 w-full h-full object-cover opacity-60 grayscale mix-blend-luminosity z-0"
+                        />
+                        <div className="relative z-10 p-8 lg:p-16 flex flex-col h-full flex-1 justify-between">
+                            <div className="flex justify-between items-start">
+                                <Link to="/" className="inline-flex items-center gap-2 text-white font-mono text-xs font-bold uppercase hover:text-brand-red transition-colors w-fit bg-brand-charcoal/50 px-3 py-2 rounded">
+                                    <ArrowLeft className="w-4 h-4" /> Return
+                                </Link>
+                                {(user?.role === 'admin' || user?.id === gym.ownerId) && (
+                                    <button
+                                        onClick={() => setIsEditMode(!isEditMode)}
+                                        className="inline-flex items-center gap-2 bg-white text-brand-charcoal font-mono text-xs font-bold uppercase px-3 py-2 hover:bg-brand-blue hover:text-white transition-colors border-2 border-brand-charcoal shadow-[4px_4px_0px_#1A1A1A]"
+                                    >
+                                        <Edit2 className="w-4 h-4" /> {isEditMode ? 'Close Edit' : 'Edit Profile'}
+                                    </button>
+                                )}
                             </div>
-                            <h1 className="text-5xl lg:text-7xl font-black text-white uppercase leading-[0.9] mb-6">
-                                {gym.name}
-                            </h1>
-                            <div className="flex gap-4 text-gray-300 font-mono text-sm">
-                                <span>• Authentic Muay Thai</span>
-                                <span>• {gym.trainers.length} Trainers</span>
-                                <span>• {courses.length} Courses</span>
+                            <div className="mt-auto pt-16">
+                                <div className="inline-block bg-brand-blue text-white font-mono text-xs font-bold px-3 py-1 mb-4 uppercase shadow-[4px_4px_0px_#1A1A1A]">
+                                    {gym.location}
+                                </div>
+                                <h1 className="text-5xl lg:text-7xl font-black text-white uppercase leading-[0.9] mb-6 drop-shadow-lg">
+                                    {gym.name}
+                                </h1>
+                                <div className="flex flex-wrap gap-4 text-white font-mono text-sm uppercase bg-brand-charcoal/80 p-3 w-fit border border-gray-700">
+                                    <span className="flex items-center gap-1"><Sparkles className="w-4 h-4 text-brand-red" /> Authentic Muay Thai</span>
+                                    <span className="flex items-center gap-1"><Target className="w-4 h-4 text-brand-blue" /> {gym.trainers.length} Trainers</span>
+                                    <span className="flex items-center gap-1"><Briefcase className="w-4 h-4 text-brand-bone" /> {courses.length} Courses</span>
+                                </div>
                             </div>
                         </div>
+                    </div>
+
+                    {/* Profile Information Section */}
+                    <div className="bg-white flex-1 border-t-2 border-brand-charcoal p-8 lg:p-16">
+                        {isEditMode ? (
+                            <div className="animate-reveal space-y-8">
+                                <div className="border-b-2 border-brand-charcoal pb-4 mb-8 flex justify-between items-end">
+                                    <h3 className="font-black text-2xl uppercase">Edit Gym Profile</h3>
+                                    <button onClick={handleSaveProfile} className="bg-brand-red text-white font-mono font-bold text-xs uppercase px-4 py-2 flex items-center gap-2 hover:bg-brand-charcoal transition shadow-[4px_4px_0px_#1A1A1A]">
+                                        <Save className="w-4 h-4" /> Save Changes
+                                    </button>
+                                </div>
+
+                                {/* Location Edit */}
+                                <div>
+                                    <label className="font-mono text-xs font-bold text-brand-blue block mb-2 uppercase flex items-center gap-2"><MapPin className="w-4 h-4" /> Google Maps Embed URL</label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. https://www.google.com/maps/embed?pb=..."
+                                        value={editMapsUrl}
+                                        onChange={(e) => setEditMapsUrl(e.target.value)}
+                                        className="w-full bg-brand-bone border-2 border-brand-charcoal p-3 font-mono text-xs focus:border-brand-blue focus:outline-none"
+                                    />
+                                    <p className="text-[10px] font-mono text-gray-500 mt-1">Paste the `src` URL from Google Maps Embed HTML.</p>
+                                </div>
+
+                                {/* Facilities Edit */}
+                                <div>
+                                    <label className="font-mono text-xs font-bold text-brand-blue block mb-4 uppercase flex items-center gap-2"><Box className="w-4 h-4" /> Facilities & Amenities</label>
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                        {[
+                                            { key: 'aircon', label: 'Air Con', icon: <Wind className="w-4 h-4" /> },
+                                            { key: 'shower', label: 'Shower Room', icon: <Droplets className="w-4 h-4" /> },
+                                            { key: 'wifi', label: 'WiFi', icon: <Wifi className="w-4 h-4" /> },
+                                            { key: 'lockers', label: 'Lockers', icon: <Lock className="w-4 h-4" /> },
+                                            { key: 'gloves', label: 'Gloves Included', icon: <Crosshair className="w-4 h-4" /> },
+                                            { key: 'ring', label: 'Boxing Ring', icon: <Target className="w-4 h-4" /> },
+                                            { key: 'weights', label: 'Weight Area', icon: <Dumbbell className="w-4 h-4" /> },
+                                        ].map(facility => (
+                                            <label key={facility.key} className={`cursor-pointer border-2 p-3 flex items-center gap-3 transition-colors ${editFacilities[facility.key] ? 'border-brand-charcoal bg-brand-charcoal text-white' : 'border-gray-200 hover:border-brand-blue'}`}>
+                                                <input
+                                                    type="checkbox"
+                                                    className="hidden"
+                                                    checked={!!editFacilities[facility.key]}
+                                                    onChange={(e) => setEditFacilities({ ...editFacilities, [facility.key]: e.target.checked })}
+                                                />
+                                                {facility.icon}
+                                                <span className="font-mono text-[10px] font-bold uppercase">{facility.label}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="animate-reveal space-y-12">
+                                {/* Bio / Description */}
+                                <div>
+                                    <h3 className="font-black text-xl uppercase mb-4 border-b-2 border-brand-charcoal pb-2 inline-block">The Camp</h3>
+                                    <p className="font-mono text-sm leading-relaxed text-gray-700 whitespace-pre-wrap">
+                                        {gym.bio || gym.description}
+                                    </p>
+                                </div>
+
+                                {/* Facilities Public View */}
+                                {editFacilities && Object.keys(editFacilities).some(k => editFacilities[k]) && (
+                                    <div>
+                                        <h3 className="font-black text-xl uppercase mb-4 border-b-2 border-brand-charcoal pb-2 inline-block">Facilities</h3>
+                                        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                                            {[
+                                                { key: 'aircon', label: 'Air Con', icon: <Wind className="w-5 h-5 text-brand-blue" /> },
+                                                { key: 'shower', label: 'Shower Room', icon: <Droplets className="w-5 h-5 text-blue-400" /> },
+                                                { key: 'wifi', label: 'WiFi', icon: <Wifi className="w-5 h-5 text-green-500" /> },
+                                                { key: 'lockers', label: 'Lockers', icon: <Lock className="w-5 h-5 text-brand-charcoal" /> },
+                                                { key: 'gloves', label: 'Gloves Included', icon: <Crosshair className="w-5 h-5 text-brand-red" /> },
+                                                { key: 'ring', label: 'Boxing Ring', icon: <Target className="w-5 h-5 text-red-600" /> },
+                                                { key: 'weights', label: 'Weight Area', icon: <Dumbbell className="w-5 h-5 text-gray-600" /> },
+                                            ].map(facility => 
+                                                editFacilities[facility.key] && (
+                                                    <div key={facility.key} className="flex items-center gap-3 font-mono text-xs uppercase font-bold p-2 bg-brand-bone border border-gray-200">
+                                                        {facility.icon} {facility.label}
+                                                    </div>
+                                                )
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Location Public View */}
+                                {editMapsUrl && (
+                                    <div>
+                                        <div className="flex justify-between items-end mb-4 border-b-2 border-brand-charcoal pb-2">
+                                            <h3 className="font-black text-xl uppercase">Location</h3>
+                                            <a 
+                                                href={(() => {
+                                                    // If it's a direct Google Maps link, just use it
+                                                    if (editMapsUrl.startsWith('http') && !editMapsUrl.includes('<iframe')) return editMapsUrl;
+                                                    
+                                                    // Otherwise, try to search for the Gym's Name and Location
+                                                    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(gym.name + ' ' + gym.location)}`;
+                                                })()}
+                                                target="_blank" rel="noopener noreferrer"
+                                                className="font-mono text-[10px] font-bold uppercase text-brand-red flex items-center gap-1 hover:underline"
+                                            >
+                                                <MapPin className="w-3 h-3" /> Get Directions
+                                            </a>
+                                        </div>
+                                        <div className="aspect-video w-full border-2 border-brand-charcoal shadow-[6px_6px_0px_#1A1A1A]">
+                                            <iframe
+                                                src={getMapEmbedSrc(editMapsUrl, gym.name, gym.location)}
+                                                width="100%"
+                                                height="100%"
+                                                style={{ border: 0 }}
+                                                allowFullScreen={false}
+                                                loading="lazy"
+                                                referrerPolicy="no-referrer-when-downgrade"
+                                            ></iframe>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
 

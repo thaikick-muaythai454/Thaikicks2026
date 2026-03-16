@@ -7,6 +7,15 @@ const ProductManagement: React.FC = () => {
     const [products, setProducts] = useState<Product[]>([]);
     const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
     const [isFormOpen, setIsFormOpen] = useState(false);
+    const [sizesInput, setSizesInput] = useState('');
+    const [colorsInput, setColorsInput] = useState('');
+
+    const openForm = (product: Partial<Product>) => {
+        setEditingProduct(product);
+        setSizesInput(product.sizes?.join(', ') || '');
+        setColorsInput(product.colors?.join(', ') || '');
+        setIsFormOpen(true);
+    };
 
     useEffect(() => {
         loadProducts();
@@ -22,17 +31,22 @@ const ProductManagement: React.FC = () => {
         if (!editingProduct) return;
 
         try {
-            if (editingProduct.id) {
-                await updateProduct(editingProduct.id, editingProduct);
+            const productToSave = {
+                ...editingProduct,
+                sizes: sizesInput.split(',').map(s => s.trim()).filter(Boolean),
+                colors: colorsInput.split(',').map(s => s.trim()).filter(Boolean)
+            };
+            if (productToSave.id) {
+                await updateProduct(productToSave.id, productToSave);
             } else {
-                await createProduct(editingProduct as Omit<Product, 'id' | 'createdAt'>);
+                await createProduct(productToSave as Omit<Product, 'id' | 'createdAt'>);
             }
             await loadProducts();
             setIsFormOpen(false);
             setEditingProduct(null);
-        } catch (err) {
+        } catch (err: any) {
             console.error(err);
-            alert("Failed to save product");
+            alert(`Failed to save product: ${err.message || 'Check console for details'}`);
         }
     };
 
@@ -55,7 +69,7 @@ const ProductManagement: React.FC = () => {
                     Product Catalog
                 </h3>
                 <button
-                    onClick={() => { setEditingProduct({ stockStatus: 'in_stock', isFeatured: false }); setIsFormOpen(true); }}
+                    onClick={() => openForm({ stockStatus: 'in_stock', isFeatured: false })}
                     className="bg-brand-charcoal text-white px-3 py-1 font-mono text-xs font-bold uppercase flex items-center gap-2 hover:bg-brand-blue"
                 >
                     <Plus className="w-3 h-3" /> New Product
@@ -91,6 +105,18 @@ const ProductManagement: React.FC = () => {
                                     <option value="out_of_stock">Out of Stock</option>
                                     <option value="pre_order">Pre-Order</option>
                                 </select>
+                            </div>
+                            <div>
+                                <label className="block text-[10px] uppercase font-bold mb-1">Stock Quantity</label>
+                                <input type="number" className="w-full border p-2 font-mono text-xs" value={editingProduct?.stockQuantity || 0} onChange={e => setEditingProduct({ ...editingProduct, stockQuantity: Number(e.target.value) })} required />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] uppercase font-bold mb-1">Sizes (comma separated)</label>
+                                <input type="text" className="w-full border p-2 font-mono text-xs" value={sizesInput} onChange={e => setSizesInput(e.target.value)} placeholder="e.g. S, M, L, XL" />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] uppercase font-bold mb-1">Colors (comma separated)</label>
+                                <input type="text" className="w-full border p-2 font-mono text-xs" value={colorsInput} onChange={e => setColorsInput(e.target.value)} placeholder="e.g. Red, Black, Blue" />
                             </div>
                         </div>
 
@@ -159,13 +185,18 @@ const ProductManagement: React.FC = () => {
                                         }`}>
                                         {product.stockStatus.replace('_', ' ')}
                                     </span>
+                                    {product.stockQuantity !== undefined && (
+                                        <span className="px-2 py-0.5 text-[10px] font-bold uppercase text-gray-500">
+                                            Qty: {product.stockQuantity}
+                                        </span>
+                                    )}
                                     {product.isFeatured && (
                                         <span className="px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-purple-100 text-purple-700">Featured</span>
                                     )}
                                 </div>
                             </div>
                             <div className="flex gap-2">
-                                <button onClick={() => { setEditingProduct(product); setIsFormOpen(true); }} className="text-brand-blue hover:text-brand-charcoal">
+                                <button onClick={() => openForm(product)} className="text-brand-blue hover:text-brand-charcoal">
                                     <Edit className="w-4 h-4" />
                                 </button>
                                 <button onClick={() => handleDelete(product.id)} className="text-red-400 hover:text-red-600">
