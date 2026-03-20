@@ -27,15 +27,20 @@ const ProductDetailsPage: React.FC<ProductDetailsPageProps> = ({ user }) => {
 
     useEffect(() => {
         setQuantity(1);
-    }, [selectedSize]);
+    }, [selectedSize, selectedColor]);
 
     const getCurrentStock = () => {
         if (!product?.variants) return 0;
-        if (product.sizes && product.sizes.length > 0) {
-            const variant = product.variants.find(v => v.size_label === selectedSize);
-            return variant ? variant.stock_quantity : 0;
-        }
-        return product.variants[0]?.stock_quantity || 0;
+        
+        const targetSize = selectedSize || 'Standard';
+        const targetColor = selectedColor || 'Default';
+        
+        const variant = product.variants.find(v => 
+            (v.size_label === targetSize || (product.sizes?.length === 0 && v.size_label === 'Standard')) && 
+            (v.color_label === targetColor || (product.colors?.length === 0 && v.color_label === 'Default'))
+        );
+        
+        return variant ? variant.stock_quantity : 0;
     };
 
     const currentStock = getCurrentStock();
@@ -188,7 +193,11 @@ const ProductDetailsPage: React.FC<ProductDetailsPageProps> = ({ user }) => {
                                     <label className="block font-mono text-xs font-bold uppercase mb-3">Select Size</label>
                                     <div className="flex flex-wrap gap-3">
                                         {product.sizes.map(size => {
-                                            const sizeVariant = product.variants?.find(v => v.size_label === size);
+                                            const targetColor = selectedColor || 'Default';
+                                            const sizeVariant = product.variants?.find(v => 
+                                                v.size_label === size && 
+                                                (v.color_label === targetColor || product.colors?.length === 0)
+                                            );
                                             const isSizeOutOfStock = !sizeVariant || sizeVariant.stock_quantity <= 0;
                                             
                                             return (
@@ -218,19 +227,32 @@ const ProductDetailsPage: React.FC<ProductDetailsPageProps> = ({ user }) => {
                                 <div>
                                     <label className="block font-mono text-xs font-bold uppercase mb-3">Primary Color</label>
                                     <div className="flex flex-wrap gap-3">
-                                        {product.colors.map(color => (
-                                            <button
-                                                key={color}
-                                                onClick={() => setSelectedColor(color)}
-                                                className={`px-5 py-3 border-2 font-mono text-sm font-bold uppercase transition-all ${
-                                                    selectedColor === color 
-                                                    ? 'border-brand-charcoal bg-brand-charcoal text-white shadow-[4px_4px_0px_#AE3A17]' 
-                                                    : 'border-brand-charcoal bg-white text-brand-charcoal hover:bg-gray-100'
-                                                }`}
-                                            >
-                                                {color}
-                                            </button>
-                                        ))}
+                                        {product.colors.map(color => {
+                                            const targetSize = selectedSize || 'Standard';
+                                            const colorVariant = product.variants?.find(v => 
+                                                v.color_label === color && 
+                                                (v.size_label === targetSize || product.sizes?.length === 0)
+                                            );
+                                            const isColorOutOfStock = !colorVariant || colorVariant.stock_quantity <= 0;
+
+                                            return (
+                                                <button
+                                                    key={color}
+                                                    onClick={() => !isColorOutOfStock && setSelectedColor(color)}
+                                                    disabled={isColorOutOfStock}
+                                                    className={`px-5 py-3 border-2 font-mono text-sm font-bold uppercase transition-all ${
+                                                        isColorOutOfStock
+                                                        ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                                                        : selectedColor === color 
+                                                        ? 'border-brand-charcoal bg-brand-charcoal text-white shadow-[4px_4px_0px_#AE3A17]' 
+                                                        : 'border-brand-charcoal bg-white text-brand-charcoal hover:bg-gray-100'
+                                                    }`}
+                                                >
+                                                    {color}
+                                                    {isColorOutOfStock && <span className="block text-[8px] mt-1 -mb-1">Sold Out</span>}
+                                                </button>
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             )}

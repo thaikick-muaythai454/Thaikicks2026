@@ -88,6 +88,7 @@ export const createProduct = async (product: Omit<Product, 'id' | 'createdAt' | 
         const variantsToInsert = variants.map(v => ({
             product_id: data.id,
             size_label: v.size_label,
+            color_label: v.color_label,
             sku: v.sku,
             stock_quantity: v.stock_quantity
         }));
@@ -134,6 +135,7 @@ export const updateProduct = async (id: string, product: Partial<Product>, varia
             const variantsToInsert = variants.map(v => ({
                 product_id: id,
                 size_label: v.size_label,
+                color_label: v.color_label,
                 sku: v.sku,
                 stock_quantity: v.stock_quantity
             }));

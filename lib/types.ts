@@ -110,6 +110,7 @@ export interface ProductVariant {
   id: string;
   product_id: string;
   size_label: string;
+  color_label: string;
   sku: string;
   stock_quantity: number;
 }

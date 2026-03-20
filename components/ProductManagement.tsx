@@ -19,7 +19,7 @@ const ProductManagement: React.FC = () => {
         const initialQuantities: Record<string, number> = {};
         if (product.variants) {
             product.variants.forEach(v => {
-                initialQuantities[v.size_label] = v.stock_quantity;
+                initialQuantities[`${v.size_label}-${v.color_label}`] = v.stock_quantity;
             });
         }
         setVariantQuantities(initialQuantities);
@@ -43,7 +43,6 @@ const ProductManagement: React.FC = () => {
         try {
             const sizes = sizesInput.split(',').map(s => s.trim()).filter(Boolean);
             const colors = colorsInput.split(',').map(s => s.trim()).filter(Boolean);
-            const firstColor = colors[0] || 'Default';
             const productName = editingProduct.name || 'Product';
 
             const productToSave = {
@@ -52,15 +51,21 @@ const ProductManagement: React.FC = () => {
                 colors
             };
 
-            const variantsToSave = sizes.length > 0 ? sizes.map(size => ({
-                size_label: size,
-                sku: `${productName.replace(/\s+/g, '-')}-${firstColor.replace(/\s+/g, '-')}-${size.replace(/\s+/g, '-')}`,
-                stock_quantity: variantQuantities[size] || 0
-            })) : [{
-                size_label: 'Standard',
-                sku: `${productName.replace(/\s+/g, '-')}-${firstColor.replace(/\s+/g, '-')}-Standard`,
-                stock_quantity: variantQuantities['Standard'] || 0
-            }];
+            const displaySizes = sizes.length > 0 ? sizes : ['Standard'];
+            const displayColors = colors.length > 0 ? colors : ['Default'];
+
+            const variantsToSave: any[] = [];
+            displaySizes.forEach(size => {
+                displayColors.forEach(color => {
+                    const key = `${size}-${color}`;
+                    variantsToSave.push({
+                        size_label: size,
+                        color_label: color,
+                        sku: `${productName.replace(/\s+/g, '-')}-${color.replace(/\s+/g, '-')}-${size.replace(/\s+/g, '-')}`,
+                        stock_quantity: variantQuantities[key] || 0
+                    });
+                });
+            });
 
             if (productToSave.id) {
                 await updateProduct(productToSave.id, productToSave, variantsToSave);
@@ -148,6 +153,7 @@ const ProductManagement: React.FC = () => {
                                 <table className="w-full text-left font-mono text-xs border border-gray-200">
                                     <thead className="bg-brand-charcoal text-white uppercase font-bold text-[10px]">
                                         <tr>
+                                            <th className="p-2 border border-gray-300">Color</th>
                                             <th className="p-2 border border-gray-300">Size</th>
                                             <th className="p-2 border border-gray-300">Auto-Generated SKU</th>
                                             <th className="p-2 border border-gray-300 w-32">Stock Qty</th>
@@ -156,29 +162,34 @@ const ProductManagement: React.FC = () => {
                                     <tbody>
                                         {(() => {
                                             const sizes = sizesInput.split(',').map(s => s.trim()).filter(Boolean);
+                                            const colors = colorsInput.split(',').map(s => s.trim()).filter(Boolean);
                                             const displaySizes = sizes.length > 0 ? sizes : ['Standard'];
-                                            const firstColor = colorsInput.split(',').map(s => s.trim()).filter(Boolean)[0] || 'Default';
+                                            const displayColors = colors.length > 0 ? colors : ['Default'];
                                             const productName = editingProduct?.name || 'Product';
                                             
-                                            return displaySizes.map(size => {
-                                                const sku = `${productName.replace(/\s+/g, '-')}-${firstColor.replace(/\s+/g, '-')}-${size.replace(/\s+/g, '-')}`;
-                                                return (
-                                                    <tr key={size} className="bg-white hover:bg-gray-50">
-                                                        <td className="p-2 border border-gray-200 font-bold">{size}</td>
-                                                        <td className="p-2 border border-gray-200 text-gray-500">{sku}</td>
-                                                        <td className="p-2 border border-gray-200">
-                                                            <input 
-                                                                type="number" 
-                                                                className="w-full border p-1 text-xs" 
-                                                                value={variantQuantities[size] || 0}
-                                                                onChange={(e) => setVariantQuantities({...variantQuantities, [size]: Number(e.target.value)})}
-                                                                min="0"
-                                                                required
-                                                            />
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            });
+                                            return displayColors.flatMap(color => 
+                                                displaySizes.map(size => {
+                                                    const key = `${size}-${color}`;
+                                                    const sku = `${productName.replace(/\s+/g, '-')}-${color.replace(/\s+/g, '-')}-${size.replace(/\s+/g, '-')}`;
+                                                    return (
+                                                        <tr key={key} className="bg-white hover:bg-gray-50">
+                                                            <td className="p-2 border border-gray-200 font-bold">{color}</td>
+                                                            <td className="p-2 border border-gray-200 font-bold">{size}</td>
+                                                            <td className="p-2 border border-gray-200 text-gray-500">{sku}</td>
+                                                            <td className="p-2 border border-gray-200">
+                                                                <input 
+                                                                    type="number" 
+                                                                    className="w-full border p-1 text-xs" 
+                                                                    value={variantQuantities[key] || 0}
+                                                                    onChange={(e) => setVariantQuantities({...variantQuantities, [key]: Number(e.target.value)})}
+                                                                    min="0"
+                                                                    required
+                                                                />
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })
+                                            );
                                         })()}
                                     </tbody>
                                 </table>
