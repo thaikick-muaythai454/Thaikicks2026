@@ -106,6 +106,14 @@ export interface Course {
 
 // --- SHOP TYPES ---
 
+export interface ProductVariant {
+  id: string;
+  product_id: string;
+  size_label: string;
+  sku: string;
+  stock_quantity: number;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -119,6 +127,7 @@ export interface Product {
   sizes?: string[];
   colors?: string[];
   stockQuantity?: number;
+  variants?: ProductVariant[];
 }
 
 export interface CartItem extends Product {

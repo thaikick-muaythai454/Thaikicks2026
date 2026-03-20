@@ -41,7 +41,11 @@ const ShopPage: React.FC<ShopPageProps> = ({ user }) => {
 
     const loadProducts = async () => {
         const data = await getProducts();
-        setProducts(data.filter(p => p.stockStatus !== 'out_of_stock'));
+        setProducts(data.filter(p => {
+            if (p.stockStatus === 'out_of_stock') return false;
+            const totalStock = p.variants ? p.variants.reduce((acc, v) => acc + v.stock_quantity, 0) : 0;
+            return totalStock > 0;
+        }));
     };
 
     const loadCartFromStorage = () => {
@@ -184,11 +188,24 @@ const ShopPage: React.FC<ShopPageProps> = ({ user }) => {
                                     <div className="flex items-center justify-between border-t border-gray-100 pt-4 mt-2">
                                         <div>
                                             <div className="text-2xl font-black text-brand-charcoal">฿{product.price.toLocaleString()}</div>
-                                            <div className={`font-mono text-[10px] uppercase mt-1 ${product.stockStatus === 'in_stock' ? 'text-green-600' :
-                                                product.stockStatus === 'low_stock' ? 'text-yellow-600' :
-                                                    'text-blue-600'
-                                                }`}>
-                                                {product.stockStatus.replace('_', ' ')}
+                                            <div className={`font-mono text-[10px] uppercase mt-1 ${
+                                                (() => {
+                                                    if (product.stockStatus === 'pre_order') return 'text-blue-600';
+                                                    if (product.stockStatus === 'low_stock') return 'text-yellow-600';
+                                                    const totalStock = product.variants ? product.variants.reduce((acc, v) => acc + v.stock_quantity, 0) : 0;
+                                                    if (totalStock <= 0) return 'text-red-600';
+                                                    if (totalStock <= 5) return 'text-yellow-600';
+                                                    return 'text-green-600';
+                                                })()
+                                            }`}>
+                                                {(() => {
+                                                    if (product.stockStatus === 'pre_order') return 'Pre-Order';
+                                                    if (product.stockStatus === 'low_stock') return 'Low Stock';
+                                                    const totalStock = product.variants ? product.variants.reduce((acc, v) => acc + v.stock_quantity, 0) : 0;
+                                                    if (totalStock <= 0) return 'Out of Stock';
+                                                    if (totalStock <= 5) return 'Low Stock';
+                                                    return 'In Stock';
+                                                })()}
                                             </div>
                                         </div>
                                         <button

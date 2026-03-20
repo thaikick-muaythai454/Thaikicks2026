@@ -9,11 +9,21 @@ const ProductManagement: React.FC = () => {
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [sizesInput, setSizesInput] = useState('');
     const [colorsInput, setColorsInput] = useState('');
+    const [variantQuantities, setVariantQuantities] = useState<Record<string, number>>({});
 
     const openForm = (product: Partial<Product>) => {
         setEditingProduct(product);
         setSizesInput(product.sizes?.join(', ') || '');
         setColorsInput(product.colors?.join(', ') || '');
+        
+        const initialQuantities: Record<string, number> = {};
+        if (product.variants) {
+            product.variants.forEach(v => {
+                initialQuantities[v.size_label] = v.stock_quantity;
+            });
+        }
+        setVariantQuantities(initialQuantities);
+        
         setIsFormOpen(true);
     };
 
@@ -31,15 +41,31 @@ const ProductManagement: React.FC = () => {
         if (!editingProduct) return;
 
         try {
+            const sizes = sizesInput.split(',').map(s => s.trim()).filter(Boolean);
+            const colors = colorsInput.split(',').map(s => s.trim()).filter(Boolean);
+            const firstColor = colors[0] || 'Default';
+            const productName = editingProduct.name || 'Product';
+
             const productToSave = {
                 ...editingProduct,
-                sizes: sizesInput.split(',').map(s => s.trim()).filter(Boolean),
-                colors: colorsInput.split(',').map(s => s.trim()).filter(Boolean)
+                sizes,
+                colors
             };
+
+            const variantsToSave = sizes.length > 0 ? sizes.map(size => ({
+                size_label: size,
+                sku: `${productName.replace(/\s+/g, '-')}-${firstColor.replace(/\s+/g, '-')}-${size.replace(/\s+/g, '-')}`,
+                stock_quantity: variantQuantities[size] || 0
+            })) : [{
+                size_label: 'Standard',
+                sku: `${productName.replace(/\s+/g, '-')}-${firstColor.replace(/\s+/g, '-')}-Standard`,
+                stock_quantity: variantQuantities['Standard'] || 0
+            }];
+
             if (productToSave.id) {
-                await updateProduct(productToSave.id, productToSave);
+                await updateProduct(productToSave.id, productToSave, variantsToSave);
             } else {
-                await createProduct(productToSave as Omit<Product, 'id' | 'createdAt'>);
+                await createProduct(productToSave as Omit<Product, 'id' | 'createdAt'>, variantsToSave);
             }
             await loadProducts();
             setIsFormOpen(false);
@@ -98,17 +124,12 @@ const ProductManagement: React.FC = () => {
                                 <input type="number" className="w-full border p-2 font-mono text-xs" value={editingProduct?.price || ''} onChange={e => setEditingProduct({ ...editingProduct, price: Number(e.target.value) })} required />
                             </div>
                             <div>
-                                <label className="block text-[10px] uppercase font-bold mb-1">Stock Status</label>
+                                <label className="block text-[10px] uppercase font-bold mb-1">Stock Status Override</label>
                                 <select className="w-full border p-2 font-mono text-xs" value={editingProduct?.stockStatus || 'in_stock'} onChange={e => setEditingProduct({ ...editingProduct, stockStatus: e.target.value as any })}>
-                                    <option value="in_stock">In Stock</option>
-                                    <option value="low_stock">Low Stock</option>
-                                    <option value="out_of_stock">Out of Stock</option>
+                                    <option value="in_stock">In Stock (Auto)</option>
+                                    <option value="out_of_stock">Out of Stock (Force)</option>
                                     <option value="pre_order">Pre-Order</option>
                                 </select>
-                            </div>
-                            <div>
-                                <label className="block text-[10px] uppercase font-bold mb-1">Stock Quantity</label>
-                                <input type="number" className="w-full border p-2 font-mono text-xs" value={editingProduct?.stockQuantity || 0} onChange={e => setEditingProduct({ ...editingProduct, stockQuantity: Number(e.target.value) })} required />
                             </div>
                             <div>
                                 <label className="block text-[10px] uppercase font-bold mb-1">Sizes (comma separated)</label>
@@ -117,6 +138,50 @@ const ProductManagement: React.FC = () => {
                             <div>
                                 <label className="block text-[10px] uppercase font-bold mb-1">Colors (comma separated)</label>
                                 <input type="text" className="w-full border p-2 font-mono text-xs" value={colorsInput} onChange={e => setColorsInput(e.target.value)} placeholder="e.g. Red, Black, Blue" />
+                            </div>
+                        </div>
+
+                        {/* Variant Matrix Table */}
+                        <div className="mt-4 border-t border-gray-300 pt-4 mb-4">
+                            <h4 className="font-black uppercase text-sm mb-2">Inventory Matrix</h4>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left font-mono text-xs border border-gray-200">
+                                    <thead className="bg-brand-charcoal text-white uppercase font-bold text-[10px]">
+                                        <tr>
+                                            <th className="p-2 border border-gray-300">Size</th>
+                                            <th className="p-2 border border-gray-300">Auto-Generated SKU</th>
+                                            <th className="p-2 border border-gray-300 w-32">Stock Qty</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {(() => {
+                                            const sizes = sizesInput.split(',').map(s => s.trim()).filter(Boolean);
+                                            const displaySizes = sizes.length > 0 ? sizes : ['Standard'];
+                                            const firstColor = colorsInput.split(',').map(s => s.trim()).filter(Boolean)[0] || 'Default';
+                                            const productName = editingProduct?.name || 'Product';
+                                            
+                                            return displaySizes.map(size => {
+                                                const sku = `${productName.replace(/\s+/g, '-')}-${firstColor.replace(/\s+/g, '-')}-${size.replace(/\s+/g, '-')}`;
+                                                return (
+                                                    <tr key={size} className="bg-white hover:bg-gray-50">
+                                                        <td className="p-2 border border-gray-200 font-bold">{size}</td>
+                                                        <td className="p-2 border border-gray-200 text-gray-500">{sku}</td>
+                                                        <td className="p-2 border border-gray-200">
+                                                            <input 
+                                                                type="number" 
+                                                                className="w-full border p-1 text-xs" 
+                                                                value={variantQuantities[size] || 0}
+                                                                onChange={(e) => setVariantQuantities({...variantQuantities, [size]: Number(e.target.value)})}
+                                                                min="0"
+                                                                required
+                                                            />
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            });
+                                        })()}
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
 
@@ -185,9 +250,9 @@ const ProductManagement: React.FC = () => {
                                         }`}>
                                         {product.stockStatus.replace('_', ' ')}
                                     </span>
-                                    {product.stockQuantity !== undefined && (
-                                        <span className="px-2 py-0.5 text-[10px] font-bold uppercase text-gray-500">
-                                            Qty: {product.stockQuantity}
+                                    {product.variants !== undefined && (
+                                        <span className="px-2 py-0.5 text-[10px] font-bold uppercase text-gray-600 bg-gray-200 rounded">
+                                            Total Qty: {product.variants.reduce((acc, v) => acc + v.stock_quantity, 0)}
                                         </span>
                                     )}
                                     {product.isFeatured && (

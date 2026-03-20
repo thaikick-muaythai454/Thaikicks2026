@@ -6,7 +6,7 @@ import { Product, ShopOrder, ShopOrderItem } from '../lib/types';
 export const getProducts = async (): Promise<Product[]> => {
     const { data, error } = await supabase
         .from('products')
-        .select('*')
+        .select('*, variants:product_variants(*)')
         .eq('is_active', true)
         .order('created_at', { ascending: false });
 
@@ -27,14 +27,15 @@ export const getProducts = async (): Promise<Product[]> => {
         createdAt: p.created_at,
         sizes: p.sizes,
         colors: p.colors,
-        stockQuantity: p.stock_quantity
+        stockQuantity: p.stock_quantity,
+        variants: p.variants
     }));
 };
 
 export const getProductById = async (id: string): Promise<Product | null> => {
     const { data, error } = await supabase
         .from('products')
-        .select('*')
+        .select('*, variants:product_variants(*)')
         .eq('id', id)
         .single();
 
@@ -55,11 +56,12 @@ export const getProductById = async (id: string): Promise<Product | null> => {
         createdAt: data.created_at,
         sizes: data.sizes,
         colors: data.colors,
-        stockQuantity: data.stock_quantity
+        stockQuantity: data.stock_quantity,
+        variants: data.variants
     };
 };
 
-export const createProduct = async (product: Omit<Product, 'id' | 'createdAt'>) => {
+export const createProduct = async (product: Omit<Product, 'id' | 'createdAt' | 'variants'>, variants?: Omit<import('../lib/types').ProductVariant, 'id' | 'product_id'>[]) => {
     const dbProduct = {
         name: product.name,
         description: product.description,
@@ -80,10 +82,27 @@ export const createProduct = async (product: Omit<Product, 'id' | 'createdAt'>) 
         .single();
 
     if (error) throw error;
+    
+    // Insert variants if provided
+    if (variants && variants.length > 0 && data) {
+        const variantsToInsert = variants.map(v => ({
+            product_id: data.id,
+            size_label: v.size_label,
+            sku: v.sku,
+            stock_quantity: v.stock_quantity
+        }));
+        
+        const { error: variantError } = await supabase
+            .from('product_variants')
+            .insert(variantsToInsert);
+            
+        if (variantError) throw variantError;
+    }
+    
     return data;
 };
 
-export const updateProduct = async (id: string, product: Partial<Product>) => {
+export const updateProduct = async (id: string, product: Partial<Product>, variants?: Omit<import('../lib/types').ProductVariant, 'id' | 'product_id'>[]) => {
     const dbProduct: any = {};
     if (product.name) dbProduct.name = product.name;
     if (product.description) dbProduct.description = product.description;
@@ -104,6 +123,29 @@ export const updateProduct = async (id: string, product: Partial<Product>) => {
         .single();
 
     if (error) throw error;
+    
+    // Update variants if provided
+    if (variants) {
+        // First delete existing variants mapping to this product
+        await supabase.from('product_variants').delete().eq('product_id', id);
+        
+        // Then insert new ones
+        if (variants.length > 0) {
+            const variantsToInsert = variants.map(v => ({
+                product_id: id,
+                size_label: v.size_label,
+                sku: v.sku,
+                stock_quantity: v.stock_quantity
+            }));
+            
+            const { error: variantError } = await supabase
+                .from('product_variants')
+                .insert(variantsToInsert);
+                
+            if (variantError) throw variantError;
+        }
+    }
+    
     return data;
 };
 

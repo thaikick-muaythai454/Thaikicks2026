@@ -24,6 +24,21 @@ const ProductDetailsPage: React.FC<ProductDetailsPageProps> = ({ user }) => {
             loadProduct(id);
         }
     }, [id]);
+
+    useEffect(() => {
+        setQuantity(1);
+    }, [selectedSize]);
+
+    const getCurrentStock = () => {
+        if (!product?.variants) return 0;
+        if (product.sizes && product.sizes.length > 0) {
+            const variant = product.variants.find(v => v.size_label === selectedSize);
+            return variant ? variant.stock_quantity : 0;
+        }
+        return product.variants[0]?.stock_quantity || 0;
+    };
+
+    const currentStock = getCurrentStock();
     
     const loadProduct = async (productId: string) => {
         setLoading(true);
@@ -44,7 +59,7 @@ const ProductDetailsPage: React.FC<ProductDetailsPageProps> = ({ user }) => {
     };
     
     const incrementQuantity = () => {
-        if (product?.stockQuantity && quantity >= product.stockQuantity) return;
+        if (quantity >= currentStock) return;
         setQuantity(prev => prev + 1);
     };
     
@@ -77,6 +92,12 @@ const ProductDetailsPage: React.FC<ProductDetailsPageProps> = ({ user }) => {
             item.selectedSize === selectedSize && 
             item.selectedColor === selectedColor
         );
+
+        const currentQtyInCart = existingIndex >= 0 ? cart[existingIndex].quantity : 0;
+        if (currentQtyInCart + quantity > currentStock) {
+            alert(`You cannot add more than ${currentStock} of this item to the cart.`);
+            return;
+        }
 
         if (existingIndex >= 0) {
             cart[existingIndex].quantity += quantity;
@@ -113,7 +134,7 @@ const ProductDetailsPage: React.FC<ProductDetailsPageProps> = ({ user }) => {
         );
     }
 
-    const isOutOfStock = product.stockStatus === 'out_of_stock' || (product.stockQuantity !== undefined && product.stockQuantity <= 0);
+    const isOutOfStock = product.stockStatus === 'out_of_stock' || currentStock <= 0;
 
     return (
         <div className="min-h-screen bg-brand-bone pb-20">
@@ -166,19 +187,28 @@ const ProductDetailsPage: React.FC<ProductDetailsPageProps> = ({ user }) => {
                                 <div>
                                     <label className="block font-mono text-xs font-bold uppercase mb-3">Select Size</label>
                                     <div className="flex flex-wrap gap-3">
-                                        {product.sizes.map(size => (
-                                            <button
-                                                key={size}
-                                                onClick={() => setSelectedSize(size)}
-                                                className={`min-w-[3rem] px-4 py-3 border-2 font-mono text-sm font-bold uppercase transition-all ${
-                                                    selectedSize === size 
-                                                    ? 'border-brand-charcoal bg-brand-charcoal text-white shadow-[4px_4px_0px_#AE3A17]' 
-                                                    : 'border-brand-charcoal bg-white text-brand-charcoal hover:bg-gray-100'
-                                                }`}
-                                            >
-                                                {size}
-                                            </button>
-                                        ))}
+                                        {product.sizes.map(size => {
+                                            const sizeVariant = product.variants?.find(v => v.size_label === size);
+                                            const isSizeOutOfStock = !sizeVariant || sizeVariant.stock_quantity <= 0;
+                                            
+                                            return (
+                                                <button
+                                                    key={size}
+                                                    onClick={() => !isSizeOutOfStock && setSelectedSize(size)}
+                                                    disabled={isSizeOutOfStock}
+                                                    className={`min-w-[3rem] px-4 py-3 border-2 font-mono text-sm font-bold uppercase transition-all ${
+                                                        isSizeOutOfStock
+                                                        ? 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'
+                                                        : selectedSize === size 
+                                                            ? 'border-brand-charcoal bg-brand-charcoal text-white shadow-[4px_4px_0px_#AE3A17]' 
+                                                            : 'border-brand-charcoal bg-white text-brand-charcoal hover:bg-gray-100'
+                                                    }`}
+                                                >
+                                                    {size}
+                                                    {isSizeOutOfStock && <span className="block text-[8px] mt-1 -mb-1">Sold Out</span>}
+                                                </button>
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             )}
@@ -216,12 +246,12 @@ const ProductDetailsPage: React.FC<ProductDetailsPageProps> = ({ user }) => {
                                         <div className="w-16 text-center font-mono text-lg font-bold border-l-2 border-r-2 border-brand-charcoal py-2">
                                             {quantity}
                                         </div>
-                                        <button onClick={incrementQuantity} className="p-3 hover:bg-gray-100 disabled:opacity-50" disabled={!!(product.stockQuantity && quantity >= product.stockQuantity)}>
+                                        <button onClick={incrementQuantity} className="p-3 hover:bg-gray-100 disabled:opacity-50" disabled={quantity >= currentStock}>
                                             <Plus className="w-5 h-5" />
                                         </button>
                                     </div>
-                                    {product.stockQuantity !== undefined && product.stockQuantity > 0 && (
-                                        <span className="ml-4 font-mono text-xs text-gray-500 uppercase">{product.stockQuantity} available</span>
+                                    {currentStock > 0 && (
+                                        <span className="ml-4 font-mono text-xs text-gray-500 uppercase">{currentStock} available</span>
                                     )}
                                 </div>
                             </div>
