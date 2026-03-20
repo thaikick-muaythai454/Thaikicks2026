@@ -72,11 +72,14 @@ const BlockInput: React.FC<{ label: string; value?: string; onChange?: (e: any) 
 const GymCard: React.FC<{ gym: Gym; onBook: () => void; isLarge?: boolean }> = ({ gym, onBook, isLarge = false }) => (
   <div className={`col-span-12 ${isLarge ? 'md:col-span-8' : 'md:col-span-4'} bg-white border border-gray-300 group opacity-0 animate-reveal fill-mode-forwards`}>
     {/* Image Container */}
-    <div className="relative w-full h-[400px] overflow-hidden bg-gray-200">
+    <div 
+      className="relative w-full h-[400px] overflow-hidden bg-gray-200 cursor-pointer group-hover:opacity-95 transition-opacity"
+      onClick={onBook}
+    >
       <img
         src={gym.images?.[0] || gym.profilePhoto || 'https://via.placeholder.com/600x400?text=No+Image'}
         alt={gym.name}
-        className="w-full h-full object-cover contrast-125 transition-all duration-500"
+        className="w-full h-full object-cover contrast-125 transition-transform duration-700 group-hover:scale-105"
       />
       {gym.isFlashSale && (
         <div className="absolute top-0 left-0 bg-brand-red text-white font-mono text-xs px-4 py-2 font-bold animate-pulse">
@@ -103,8 +106,8 @@ const GymCard: React.FC<{ gym: Gym; onBook: () => void; isLarge?: boolean }> = (
         {isLarge && <span className="border border-gray-200 px-3 py-1 font-mono text-[10px] uppercase text-gray-500">Professional Ring</span>}
       </div>
 
-      <div className="flex justify-end">
-        <button onClick={onBook} className="font-mono text-xs font-bold uppercase text-brand-blue hover:text-brand-red border-b-2 border-brand-blue hover:border-brand-red transition-colors pb-1">
+      <div className="flex justify-end pt-4 mt-auto">
+        <button onClick={onBook} className="bg-brand-blue text-white font-black uppercase px-8 py-4 text-sm hover:bg-brand-charcoal transition-all w-full md:w-auto shadow-[4px_4px_0px_#1A1A1A] hover:translate-y-1 hover:shadow-none">
           Book Session
         </button>
       </div>
