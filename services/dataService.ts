@@ -304,7 +304,7 @@ export const createBooking = async (booking: Partial<Booking>) => {
         date: booking.date,
         type: booking.type,
         total_price: booking.totalPrice,
-        status: 'confirmed',
+        status: booking.status || 'pending',
         commission_amount: booking.commissionAmount || 0,
         start_time: booking.startTime,
         end_time: booking.endTime,

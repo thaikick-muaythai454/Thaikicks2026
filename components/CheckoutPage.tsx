@@ -4,7 +4,7 @@ import { ShoppingBag, ArrowLeft, CreditCard } from 'lucide-react';
 import { CartItem } from '../lib/types';
 import { createShopOrder } from '../services/shopService';
 import { User } from '../lib/types';
-// import { supabase } from '../lib/supabaseClient'; // Re-enable with Stripe
+import { supabase } from '../lib/supabaseClient'; // Enabled for Stripe
 
 interface CheckoutPageProps {
     user: User | null;
@@ -86,21 +86,13 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ user }) => {
             };
             localStorage.setItem('thaikick_last_order', JSON.stringify(receiptData));
 
-            // ── DEV MODE: Bypass Stripe ──────────────────────────────────────
-            // [TESTING] Skip payment gateway — mark order as paid directly
-            // To re-enable Stripe, remove this block and uncomment the block below
-            localStorage.removeItem('thaikick_cart');
-            setCart([]);
-            navigate('/checkout-success');
-            return;
-            // ── END DEV MODE ─────────────────────────────────────────────────
-
-            /* ── PRODUCTION: Stripe Checkout ────────────────────────────────
-            const { data: { sessionUrl }, error: stripeError } = await supabase.functions.invoke('stripe-checkout', {
+            // ── PRODUCTION: Stripe Checkout ────────────────────────────────
+            const { data: { url: sessionUrl }, error: stripeError } = await supabase.functions.invoke('stripe-checkout', {
                 body: {
                     orderId: createdOrder.id,
                     successUrl: `${window.location.origin}/#/checkout-success`,
-                    cancelUrl: `${window.location.origin}/#/checkout`
+                    cancelUrl: `${window.location.origin}/#/checkout`,
+                    type: 'shop'
                 }
             });
 
@@ -116,7 +108,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ user }) => {
             } else {
                 navigate('/checkout-success');
             }
-            ── END PRODUCTION ──────────────────────────────────────────────── */
+            // ── END PRODUCTION ────────────────────────────────────────────────
         } catch (error) {
             console.error('Order failed:', error);
             alert('Failed to create order. Please try again.');

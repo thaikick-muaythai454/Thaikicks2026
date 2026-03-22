@@ -39,3 +39,12 @@ supabase functions deploy stripe-checkout
 3. **Frontend**: Redirects the user to Stripe's hosted checkout page.
 4. **Stripe**: User completes payment and is redirected back to `/checkout-success`.
 5. **Webhook**: Stripe sends a `checkout.session.completed` event to confirmed the payment in our database.
+
+## 7. Activating PromptPay
+1. Go to [Stripe Payment Methods Settings](https://dashboard.stripe.com/settings/payments).
+2. Locate **PromptPay** and click **Turn on** or **Activate**.
+3. *Note: Stripe supports PromptPay only for accounts in Thailand.*
+
+## 8. Automated vs Manual
+- **Automated (Stripe)**: User pays via Stripe (Card/PromptPay),ระบบยืนยันอัตโนมัติ
+- **Manual (Standard PromptPay)**: (Deprecated) User scans manual QR and sends slip.

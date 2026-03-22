@@ -276,7 +276,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ gyms, user, setBookings }) =>
                     totalPrice: total,
                     commissionPaidTo: (referralCode && codeValid) ? referralCode : undefined,
                     commissionAmount: (referralCode && codeValid) ? Math.round(total * ((gym.affiliatePercentage || 0) / 100)) : 0,
-                    status: paymentMethod === 'card' ? 'pending' : 'confirmed'
+                    status: 'pending'
                 };
                 bookingPromises.push(createBooking(bookingPayload));
             } else {
@@ -298,7 +298,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ gyms, user, setBookings }) =>
                         totalPrice: Math.round(pricePerSession),
                         commissionPaidTo: (referralCode && codeValid) ? referralCode : undefined,
                         commissionAmount: (referralCode && codeValid) ? Math.round(pricePerSession * ((gym.affiliatePercentage || 0) / 100)) : 0,
-                        status: paymentMethod === 'card' ? 'pending' : 'confirmed'
+                        status: 'pending'
                     };
                     bookingPromises.push(createBooking(bookingPayload));
 
@@ -321,7 +321,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ gyms, user, setBookings }) =>
             // For checkout, we use the ID of the first created booking to represent the session
             mainBookingId = createdBookings[0][0]?.id; // Assuming createBooking returns array of inserted 
 
-            if (paymentMethod === 'card' && mainBookingId) {
+            if (mainBookingId) {
                 // Save fake receipt data to local storage for the success page to pick up (since it reads from shop format)
                 localStorage.setItem('thaikick_last_order', JSON.stringify({
                     id: mainBookingId,
@@ -796,30 +796,36 @@ const BookingPage: React.FC<BookingPageProps> = ({ gyms, user, setBookings }) =>
                                     </div>
 
                                     {paymentMethod === 'card' ? (
-                                        <div className="opacity-50 pointer-events-none grayscale border-2 border-gray-200 p-4 flex items-center gap-4 bg-gray-50 animate-reveal">
-                                            <CreditCard className="w-6 h-6 text-gray-400" />
-                                            <span className="font-mono text-sm text-gray-500">•••• •••• •••• 4242</span>
-                                            <span className="font-mono text-xs text-brand-blue ml-auto font-bold">VISA</span>
+                                        <div className="border-2 border-brand-charcoal p-4 flex items-center gap-4 bg-white animate-reveal">
+                                            <CreditCard className="w-6 h-6 text-brand-blue" />
+                                            <div>
+                                                <div className="font-bold uppercase text-sm">Pay with Credit Card</div>
+                                                <div className="font-mono text-[10px] text-gray-500">Secure checkout powered by Stripe.</div>
+                                            </div>
+                                            <span className="font-mono text-xs text-brand-blue ml-auto font-bold uppercase tracking-widest">Secure</span>
                                         </div>
                                     ) : (
-                                        <div className="border-2 border-brand-blue p-6 bg-white text-center animate-reveal relative overflow-hidden">
-                                            <div className="absolute top-0 left-0 bg-brand-blue text-white text-[10px] font-bold px-2 py-1">THAI QR PAYMENT</div>
-                                            <img src="https://upload.wikimedia.org/wikipedia/commons/c/c5/PromptPay-logo.png" className="h-6 mx-auto mb-4 opacity-80" alt="PromptPay" />
-                                            <div className="w-40 h-40 bg-white mx-auto mb-4 p-2 border-2 border-brand-charcoal flex items-center justify-center">
-                                                <QRCodeSVG
-                                                    value={generatePayload(dynamicPromptPayNumber, { amount: calculateTotal() })}
-                                                    size={140}
-                                                    level="L"
-                                                />
+                                        <div className="border-2 border-brand-blue p-6 bg-white animate-reveal relative overflow-hidden flex items-center gap-6">
+                                            <div className="absolute top-0 left-0 bg-brand-blue text-white text-[10px] font-bold px-2 py-1 uppercase">Automated PromptPay</div>
+                                            <div className="w-20 h-20 bg-brand-bone border-2 border-brand-blue flex items-center justify-center">
+                                                <img src="https://upload.wikimedia.org/wikipedia/commons/c/c5/PromptPay-logo.png" className="w-12 opacity-80" alt="PromptPay" />
                                             </div>
-                                            <p className="font-mono text-sm font-bold text-brand-charcoal mb-1">
-                                                Total: ฿{calculateTotal().toLocaleString()}
-                                            </p>
-                                            <p className="font-mono text-[10px] text-gray-500">
-                                                Scan using any Banking App
-                                            </p>
+                                            <div>
+                                                <div className="font-black text-lg uppercase text-brand-charcoal mb-1">Stripe PromptPay</div>
+                                                <p className="font-mono text-xs text-gray-500 max-w-xs">
+                                                    สแกนจ่ายผ่านระบบ Stripe เพื่อยืนยันการจองทันทีโดยไม่ต้องส่งสลิปมือครับ
+                                                </p>
+                                            </div>
                                         </div>
                                     )}
+
+                                    <div className="mt-8 pt-6 border-t border-gray-100 text-center">
+                                        <div className="text-[10px] font-mono text-gray-400 uppercase tracking-widest mb-1">Total Amount</div>
+                                        <div className="font-black text-2xl text-brand-charcoal">฿{calculateTotal().toLocaleString()}</div>
+                                        <p className="font-mono text-[10px] text-gray-500 mt-2">
+                                            Redirect to Secure Payment Page
+                                        </p>
+                                    </div>
                                 </div>
 
                                 <div className="flex gap-4">
