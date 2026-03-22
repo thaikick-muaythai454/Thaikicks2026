@@ -19,7 +19,7 @@ serve(async (req) => {
     }
 
     try {
-        const { orderId, successUrl, cancelUrl, type = 'shop' } = await req.json();
+        const { orderId, successUrl, cancelUrl, type = 'shop', paymentMethods } = await req.json();
 
         const supabase = createClient(
             Deno.env.get("SUPABASE_URL") ?? "",
@@ -42,7 +42,7 @@ serve(async (req) => {
                 price_data: {
                     currency: "thb",
                     product_data: {
-                        name: `Booking at ${booking.gym_name}`,
+                        name: `Booking at ${booking.gym_name || 'Gym'}`,
                         description: `${booking.type.toUpperCase()} - ${booking.date}`,
                     },
                     unit_amount: Math.round(booking.total_price * 100), // in satang
@@ -81,7 +81,7 @@ serve(async (req) => {
 
         // 3. Create Stripe Checkout Session
         const session = await stripe.checkout.sessions.create({
-            payment_method_types: ["card", "promptpay"],
+            payment_method_types: paymentMethods || ["card", "promptpay"],
             line_items,
             mode: "payment",
             success_url: successUrl,
@@ -95,6 +95,10 @@ serve(async (req) => {
         // 4. Save session ID
         if (type === 'booking') {
             // Wait until webhook to finalize, but could save session id if we had a column
+            await supabase
+                .from("bookings")
+                .update({ stripe_session_id: session.id })
+                .eq("id", orderId);
         } else {
             await supabase
                 .from("shop_orders")
@@ -107,6 +111,7 @@ serve(async (req) => {
             status: 200,
         });
     } catch (error) {
+        console.error("Function error:", error);
         return new Response(JSON.stringify({ error: error.message }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
             status: 400,

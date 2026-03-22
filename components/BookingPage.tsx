@@ -319,7 +319,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ gyms, user, setBookings }) =>
             }
 
             // For checkout, we use the ID of the first created booking to represent the session
-            mainBookingId = createdBookings[0][0]?.id; // Assuming createBooking returns array of inserted 
+            mainBookingId = createdBookings[0]?.id;
 
             if (mainBookingId) {
                 // Save fake receipt data to local storage for the success page to pick up (since it reads from shop format)
@@ -340,9 +340,9 @@ const BookingPage: React.FC<BookingPageProps> = ({ gyms, user, setBookings }) =>
                 const cancelUrl = window.location.href;
 
                 try {
-                    const checkoutUrl = await createBookingCheckoutSession(mainBookingId, successUrl, cancelUrl);
+                    const checkoutUrl = await createBookingCheckoutSession(mainBookingId, successUrl, cancelUrl, [paymentMethod]);
                     window.location.href = checkoutUrl;
-                    return; // Prevent navigating to dashboard immediately
+                    return; 
                 } catch (stripeErr) {
                     console.error("Stripe Checkout Error:", stripeErr);
                     alert("Could not connect to Stripe. Please try again.");
@@ -353,9 +353,9 @@ const BookingPage: React.FC<BookingPageProps> = ({ gyms, user, setBookings }) =>
 
             setIsProcessing(false);
             navigate('/dashboard');
-        } catch (error) {
-            console.error("Booking Error:", error);
-            alert("Payment processing failed. Please try again or contact support.");
+        } catch (error: any) {
+            console.error("Booking Error Detail:", error);
+            alert(`Payment processing failed: ${error.message || 'Unknown error'}. Please check browser console.`);
             setIsProcessing(false);
         }
     };
@@ -854,7 +854,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ gyms, user, setBookings }) =>
                     </div>
                 </div>
             </div>
-        </div >
+        </div>
     );
 };
 
