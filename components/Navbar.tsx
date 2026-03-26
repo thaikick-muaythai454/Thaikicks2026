@@ -84,15 +84,20 @@ const Navbar: React.FC<NavbarProps> = ({ activeUser, onLogout }) => {
             <div className="hidden md:flex items-center gap-6">
               {activeUser ? (
                 <div className="flex items-center gap-4">
-                  <div className="flex flex-col items-end">
-                    <span className="font-bold text-xs uppercase text-brand-charcoal">{activeUser.name}</span>
-                    <span className="font-mono text-[10px] text-gray-500 uppercase">{activeUser.role}</span>
-                  </div>
-                  {activeUser.avatar ? (
-                    <img src={activeUser.avatar} alt="Profile" className="w-8 h-8 rounded-full object-cover border-2 border-brand-charcoal" />
-                  ) : (
-                    <div className="w-8 h-8 rounded-full border-2 border-brand-charcoal bg-gray-100 flex items-center justify-center text-xs font-bold text-brand-charcoal uppercase">{activeUser.name.charAt(0)}</div>
-                  )}
+                  <Link 
+                    to={activeUser.role === 'customer' ? '/dashboard' : (activeUser.role as string) === 'gymowner' ? '/owner' : '/admin'}
+                    className="flex items-center gap-4 hover:opacity-80 transition-opacity cursor-pointer group"
+                  >
+                    <div className="flex flex-col items-end">
+                      <span className="font-bold text-xs uppercase text-brand-charcoal group-hover:text-brand-red transition-colors">{activeUser.name}</span>
+                      <span className="font-mono text-[10px] text-gray-500 uppercase">{activeUser.role}</span>
+                    </div>
+                    {activeUser.avatar ? (
+                      <img src={activeUser.avatar} alt="Profile" className="w-8 h-8 rounded-full object-cover transition-colors shadow-sm" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-bold text-brand-charcoal uppercase group-hover:text-brand-red transition-colors shadow-sm">{activeUser.name.charAt(0)}</div>
+                    )}
+                  </Link>
                   <button
                     onClick={handleLogout}
                     className="p-2 border border-gray-200 hover:bg-brand-red hover:text-white hover:border-brand-red transition-colors rounded-full ml-2"
@@ -170,17 +175,21 @@ const Navbar: React.FC<NavbarProps> = ({ activeUser, onLogout }) => {
             <div className="border-t border-gray-100 pt-4 mt-2">
               {activeUser ? (
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
+                  <Link 
+                    to={activeUser.role === 'customer' ? '/dashboard' : (activeUser.role as string) === 'gymowner' ? '/owner' : '/admin'}
+                    onClick={closeMobileMenu}
+                    className="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer group"
+                  >
                     {activeUser.avatar ? (
-                      <img src={activeUser.avatar} alt="Profile" className="w-10 h-10 rounded-full object-cover border-2 border-brand-charcoal" />
+                      <img src={activeUser.avatar} alt="Profile" className="w-10 h-10 rounded-full object-cover transition-colors shadow-sm" />
                     ) : (
-                      <div className="w-10 h-10 rounded-full border-2 border-brand-charcoal bg-gray-100 flex items-center justify-center text-sm font-bold text-brand-charcoal uppercase">{activeUser.name.charAt(0)}</div>
+                      <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-sm font-bold text-brand-charcoal uppercase group-hover:text-brand-red transition-colors shadow-sm">{activeUser.name.charAt(0)}</div>
                     )}
                     <div className="flex flex-col">
-                      <span className="font-bold text-sm uppercase text-brand-charcoal">{activeUser.name}</span>
+                      <span className="font-bold text-sm uppercase text-brand-charcoal group-hover:text-brand-red transition-colors">{activeUser.name}</span>
                       <span className="font-mono text-xs text-gray-500 uppercase">{activeUser.role}</span>
                     </div>
-                  </div>
+                  </Link>
                   <button
                     onClick={handleLogout}
                     className="p-2 border border-gray-200 hover:bg-brand-red hover:text-white hover:border-brand-red transition-colors rounded-full"

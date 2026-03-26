@@ -122,7 +122,8 @@ const HomePage: React.FC<{
   categoryFilter?: 'gym' | 'camp';
   heroImages?: string[];
   currentHeroIndex?: number;
-}> = ({ user, gyms, setBookings, categoryFilter, heroImages = [], currentHeroIndex = 0 }) => {
+  heroFilterEnabled?: boolean;
+}> = ({ user, gyms, setBookings, categoryFilter, heroImages = [], currentHeroIndex = 0, heroFilterEnabled = true }) => {
   const navigate = useNavigate();
   const [announcements, setAnnouncements] = useState<any[]>([]);
 
@@ -166,8 +167,12 @@ const HomePage: React.FC<{
                 className="w-full h-full object-cover scale-105"
               />
               {/* Overlay for text legibility (matches the white theme of the site) */}
-              <div className="absolute inset-0 bg-gradient-to-r from-white via-white/80 to-transparent" />
-              <div className="absolute inset-0 bg-gradient-to-t from-white via-white/20 to-transparent" />
+              {heroFilterEnabled && (
+                <>
+                  <div className="absolute inset-0 bg-gradient-to-r from-white via-white/80 to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-white via-white/20 to-transparent" />
+                </>
+              )}
             </div>
           ))}
         </div>
@@ -177,31 +182,31 @@ const HomePage: React.FC<{
         {/* Hero */}
         <div className="pt-32 lg:pt-44 pb-16 grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr] gap-10 items-end">
           <div>
-            <Mono className="text-brand-red block mb-6">Bangkok • Phuket • Chiang Mai</Mono>
-            <h1 className="text-[clamp(3.5rem,8vw,8rem)] font-black text-brand-charcoal leading-[0.9] tracking-tight">
+            <Mono className={`block mb-6 ${heroFilterEnabled ? 'text-brand-red' : 'text-brand-red drop-shadow-md'}`}>Bangkok • Phuket • Chiang Mai</Mono>
+            <h1 className={`text-[clamp(3.5rem,8vw,8rem)] font-black leading-[0.9] tracking-tight ${heroFilterEnabled ? 'text-brand-charcoal' : 'text-white drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)]'}`}>
               {categoryFilter === 'gym' ? 'ELITE GYMS ' : categoryFilter === 'camp' ? 'AUTHENTIC CAMPS ' : 'FORGE YOUR'}<br />
-              <span className="text-brand-red">{categoryFilter ? 'SELECTION' : 'LEGACY.'}</span>
+              <span className={heroFilterEnabled ? 'text-brand-red' : 'text-brand-red drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)]'}>{categoryFilter ? 'SELECTION' : 'LEGACY.'}</span>
             </h1>
             <div className="flex flex-col sm:flex-row gap-4 mt-8">
-              <button className="bg-brand-red text-white font-black uppercase text-lg px-8 py-4 hover:bg-brand-charcoal transition-colors whitespace-nowrap" onClick={() => {
+              <button className="bg-brand-red text-white font-black uppercase text-lg px-8 py-4 hover:bg-brand-charcoal transition-colors whitespace-nowrap shadow-lg" onClick={() => {
                 const element = document.getElementById('gyms');
                 if (element) element.scrollIntoView({ behavior: 'smooth' });
               }}>
                 BOOK YOUR TRAINING NOW
               </button>
-              <button className="bg-brand-blue text-white font-black uppercase text-lg px-8 py-4 hover:bg-brand-charcoal transition-colors whitespace-nowrap" onClick={() => {
+              <button className="bg-brand-blue text-white font-black uppercase text-lg px-8 py-4 hover:bg-brand-charcoal transition-colors whitespace-nowrap shadow-lg" onClick={() => {
                 const element = document.getElementById('gyms');
                 if (element) element.scrollIntoView({ behavior: 'smooth' });
               }}>
                 EXPLORE GYMS
               </button>
             </div>
-            <div className="mt-4 font-mono text-xs text-brand-charcoal opacity-70 flex items-center gap-2 flex-wrap">
-              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+            <div className={`mt-4 font-mono text-xs flex items-center gap-2 flex-wrap ${heroFilterEnabled ? 'text-brand-charcoal opacity-70' : 'text-gray-100 opacity-100 drop-shadow-md font-bold'}`}>
+              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse shadow-[0_0_5px_#22c55e]"></span>
               Verified Gyms | Secure Stripe Payment | Instant Confirmation
             </div>
           </div>
-          <div className="font-mono text-sm leading-relaxed border-l-2 border-brand-blue pl-8 text-brand-charcoal opacity-80 mb-4 lg:mb-0">
+          <div className={`font-mono text-sm leading-relaxed border-l-2 pl-8 mb-4 lg:mb-0 ${heroFilterEnabled ? 'border-brand-blue text-brand-charcoal opacity-80' : 'border-brand-red text-white opacity-100 drop-shadow-lg font-bold bg-black/30 p-4 rounded-r-lg backdrop-blur-sm'}`}>
             The world's most curated platform for authentic Muay Thai training.
             From backyard rings to world-class stadiums.
           </div>
@@ -799,6 +804,7 @@ const App: React.FC = () => {
     // Fallback image if none are loaded from settings
     'https://images.unsplash.com/photo-1599552375107-160de4e511cf?auto=format&fit=crop&q=80'
   ]);
+  const [heroFilterEnabled, setHeroFilterEnabled] = useState(true);
 
   useEffect(() => {
     if (heroImages.length <= 1) return;
@@ -967,6 +973,11 @@ const App: React.FC = () => {
               console.error("Failed to parse hero_images", e);
             }
           }
+          
+          const filterSetting = await getSystemSetting('hero_filter_enabled');
+          if (filterSetting !== null) {
+            setHeroFilterEnabled(filterSetting !== 'false');
+          }
         }
       } catch (err) {
         console.warn("Failed to load user data", err);
@@ -1069,9 +1080,9 @@ const App: React.FC = () => {
 
         <main className="flex-1">
           <Routes>
-            <Route path="/" element={<HomePage user={activeUser} gyms={gyms} setBookings={setBookings} heroImages={heroImages} currentHeroIndex={currentHeroIndex} />} />
-            <Route path="/gyms" element={<HomePage user={activeUser} gyms={gyms} setBookings={setBookings} categoryFilter="gym" heroImages={heroImages} currentHeroIndex={currentHeroIndex} />} />
-            <Route path="/camps" element={<HomePage user={activeUser} gyms={gyms} setBookings={setBookings} categoryFilter="camp" heroImages={heroImages} currentHeroIndex={currentHeroIndex} />} />
+            <Route path="/" element={<HomePage user={activeUser} gyms={gyms} setBookings={setBookings} heroImages={heroImages} currentHeroIndex={currentHeroIndex} heroFilterEnabled={heroFilterEnabled} />} />
+            <Route path="/gyms" element={<HomePage user={activeUser} gyms={gyms} setBookings={setBookings} categoryFilter="gym" heroImages={heroImages} currentHeroIndex={currentHeroIndex} heroFilterEnabled={heroFilterEnabled} />} />
+            <Route path="/camps" element={<HomePage user={activeUser} gyms={gyms} setBookings={setBookings} categoryFilter="camp" heroImages={heroImages} currentHeroIndex={currentHeroIndex} heroFilterEnabled={heroFilterEnabled} />} />
             <Route path="/booking/:gymId" element={<BookingPage gyms={gyms} user={activeUser} setBookings={setBookings} />} />
             <Route path="/dashboard" element={activeUser?.role === 'customer' ? <CustomerDashboard user={activeUser} bookings={bookings} requestAffiliate={handleAffiliateRequest} onUpdateUser={setActiveUser} /> : <HomePage user={activeUser} gyms={gyms} setBookings={setBookings} heroImages={heroImages} currentHeroIndex={currentHeroIndex} />} />
             <Route path="/owner" element={(activeUser?.role as string) === 'gymowner' ? <OwnerDashboard user={activeUser} gyms={gyms} updateGym={handleUpdateGym} refreshGyms={() => getGyms().then(setGyms)} bookings={bookings} /> : <HomePage user={activeUser} gyms={gyms} setBookings={setBookings} heroImages={heroImages} currentHeroIndex={currentHeroIndex} />} />

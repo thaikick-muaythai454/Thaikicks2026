@@ -363,7 +363,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ gyms, user, setBookings }) =>
     return (
         <div className="min-h-screen bg-brand-bone animate-reveal">
             <div className="max-w-[1440px] mx-auto grid grid-cols-1 lg:grid-cols-2 min-h-screen">
-                <div className="relative flex flex-col lg:h-auto bg-gray-900 border-r-2 border-brand-charcoal order-1 lg:order-none lg:overflow-y-auto" style={{ maxHeight: '100vh' }}>
+                <div className="relative flex flex-col bg-gray-900 border-r-2 border-brand-charcoal order-1 lg:order-none">
                     {/* Header Background */}
                     <div className="relative flex-shrink-0 min-h-[300px] lg:min-h-[500px] flex flex-col">
                         <img
@@ -523,17 +523,17 @@ const BookingPage: React.FC<BookingPageProps> = ({ gyms, user, setBookings }) =>
                     </div>
                 </div>
 
-                <div className="bg-white flex flex-col justify-center p-8 lg:p-24 relative order-2 lg:order-none">
-                    <div className="max-w-md w-full mx-auto">
-                        <div className="mb-10 flex items-center justify-between border-b-2 border-brand-charcoal pb-4">
-                            <h2 className="font-black text-2xl uppercase text-brand-charcoal">
+                <div className="bg-white flex flex-col p-6 lg:p-12 order-2 lg:order-none h-full">
+                    <div className="max-w-md w-full mx-auto lg:sticky lg:top-24 py-8 lg:py-0">
+                        <div className="mb-6 flex items-center justify-between border-b-2 border-brand-charcoal pb-3">
+                            <h2 className="font-black text-xl lg:text-2xl uppercase text-brand-charcoal">
                                 {step === 'booking' ? 'Secure Booking' : 'Finalize Payment'}
                             </h2>
                             <Shield className="w-6 h-6 text-brand-blue" />
                         </div>
 
                         {step === 'booking' ? (
-                            <div className="space-y-8 mb-12 animate-reveal">
+                            <div className="space-y-5 mb-8 animate-reveal">
 
                                 {/* Class Type */}
                                 <div className="space-y-3">
@@ -570,7 +570,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ gyms, user, setBookings }) =>
                                                     setStartDate(e.target.value);
                                                     if (!endDate) setEndDate(e.target.value);
                                                 }}
-                                                className={`w-full bg-brand-bone border-2 border-gray-200 p-4 font-mono text-brand-charcoal text-xs focus:border-brand-blue focus:outline-none transition-colors ${gym.category === 'camp' && gym.startDate ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                className={`w-full bg-brand-bone border-2 border-gray-200 p-3 font-mono text-brand-charcoal text-xs focus:border-brand-blue focus:outline-none transition-colors ${gym.category === 'camp' && gym.startDate ? 'opacity-50 cursor-not-allowed' : ''}`}
                                             />
                                         </div>
                                         {type !== 'course' && (
@@ -582,7 +582,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ gyms, user, setBookings }) =>
                                                     min={startDate}
                                                     disabled={gym.category === 'camp' && !!gym.endDate}
                                                     onChange={(e) => setEndDate(e.target.value)}
-                                                    className={`w-full bg-brand-bone border-2 border-gray-200 p-4 font-mono text-brand-charcoal text-xs focus:border-brand-blue focus:outline-none transition-colors ${gym.category === 'camp' && gym.endDate ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                    className={`w-full bg-brand-bone border-2 border-gray-200 p-3 font-mono text-brand-charcoal text-xs focus:border-brand-blue focus:outline-none transition-colors ${gym.category === 'camp' && gym.endDate ? 'opacity-50 cursor-not-allowed' : ''}`}
                                                 />
                                             </div>
                                         )}
@@ -686,7 +686,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ gyms, user, setBookings }) =>
 
                                 <button
                                     onClick={handleProceedToPayment}
-                                    className="w-full bg-brand-charcoal text-white font-black uppercase py-5 text-lg hover:bg-brand-blue transition-colors flex items-center justify-center gap-3 shadow-[8px_8px_0px_0px_#AE3A17]"
+                                    className="w-full bg-brand-charcoal text-white font-black uppercase py-4 text-base hover:bg-brand-blue transition-colors flex items-center justify-center gap-3 shadow-[8px_8px_0px_0px_#AE3A17]"
                                 >
                                     Proceed to Payment
                                 </button>

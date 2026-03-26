@@ -8,6 +8,30 @@ import { getProducts, createProduct, updateProduct, deleteProduct } from '../ser
 import ProductManagement from './ProductManagement';
 import EventManagement from './EventManagement';
 
+const DEFAULT_PRIVACY_TEXT = `**Effective Date:** January 1, 2026
+
+This page contains the official documentation for our Privacy Policy. We take your data security and privacy seriously.
+
+## USER DATA DELETION
+
+At ThaiKicks, we respect your right to privacy and control over your personal data. If you wish to delete your account and all associated data, you can do so by:
+
+- **Email Request:** Send an email to support@thaikicks.com with the subject "Data Deletion Request". Please include your registered email address.
+- **Verification:** For security purposes, we will verify your identity before processing the deletion.
+- **Timeframe:** Data deletion requests are typically processed within 7-14 business days. Once deleted, your account history, bookings, and profile information cannot be recovered.
+
+Please check back soon for the full terms and conditions governing the use of the THAIKICKS platform and booking system.
+
+For any immediate legal inquiries, please contact our support team at legal@thaikicks.com.`;
+
+const DEFAULT_GENERIC_TEXT = `**Effective Date:** January 1, 2026
+
+This page contains the official documentation. We take your data security and privacy seriously.
+
+Please check back soon for the full terms and conditions governing the use of the THAIKICKS platform and booking system.
+
+For any immediate legal inquiries, please contact our support team at legal@thaikicks.com.`;
+
 interface AdminDashboardProps {
   gyms: Gym[];
   setGyms: (gyms: Gym[]) => void;
@@ -84,6 +108,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ gyms, setGyms, bookings
 
   // Settings State
   const [promptPayNumber, setPromptPayNumber] = useState("");
+  const [legalPrivacyPolicy, setLegalPrivacyPolicy] = useState("");
+  const [legalTermsOfService, setLegalTermsOfService] = useState("");
+  const [legalRefundPolicy, setLegalRefundPolicy] = useState("");
+  const [legalCancellationPolicy, setLegalCancellationPolicy] = useState("");
+  const [legalContact, setLegalContact] = useState("");
   const [isSettingsLoading, setIsSettingsLoading] = useState(false);
 
   // Shop/Product State
@@ -94,6 +123,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ gyms, setGyms, bookings
   // Appearance State
   const [heroImages, setHeroImages] = useState<string[]>([]);
   const [isUploadingHero, setIsUploadingHero] = useState(false);
+  const [heroFilterEnabled, setHeroFilterEnabled] = useState(true);
 
   // Tabs
   const [activeTab, setActiveTab] = useState<'overview' | 'gyms' | 'announcements' | 'bookings' | 'courses' | 'shop' | 'appearance' | 'settings'>('overview');
@@ -103,6 +133,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ gyms, setGyms, bookings
       const number = await getSystemSetting('promptpay_number');
       if (number) setPromptPayNumber(number);
 
+      const ppSetting = await getSystemSetting('legal_privacy_policy');
+      setLegalPrivacyPolicy(ppSetting || DEFAULT_PRIVACY_TEXT);
+      const tosSetting = await getSystemSetting('legal_terms_of_service');
+      setLegalTermsOfService(tosSetting || DEFAULT_GENERIC_TEXT);
+      const rpSetting = await getSystemSetting('legal_refund_policy');
+      setLegalRefundPolicy(rpSetting || DEFAULT_GENERIC_TEXT);
+      const cpSetting = await getSystemSetting('legal_cancellation_policy');
+      setLegalCancellationPolicy(cpSetting || DEFAULT_GENERIC_TEXT);
+      const contactSetting = await getSystemSetting('legal_contact');
+      setLegalContact(contactSetting || DEFAULT_GENERIC_TEXT);
+
       const heroSetting = await getSystemSetting('hero_images');
       if (heroSetting) {
         try {
@@ -111,6 +152,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ gyms, setGyms, bookings
         } catch (e) {
           console.error("Failed to parse hero_images", e);
         }
+      }
+
+      const filterSetting = await getSystemSetting('hero_filter_enabled');
+      if (filterSetting !== null) {
+        setHeroFilterEnabled(filterSetting !== 'false');
       }
     };
 
@@ -287,6 +333,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ gyms, setGyms, bookings
     setIsSettingsLoading(true);
     try {
       await updateSystemSetting('promptpay_number', promptPayNumber);
+      await updateSystemSetting('legal_privacy_policy', legalPrivacyPolicy);
+      await updateSystemSetting('legal_terms_of_service', legalTermsOfService);
+      await updateSystemSetting('legal_refund_policy', legalRefundPolicy);
+      await updateSystemSetting('legal_cancellation_policy', legalCancellationPolicy);
+      await updateSystemSetting('legal_contact', legalContact);
       alert("Settings saved successfully");
     } catch (err) {
       console.error(err);
@@ -713,6 +764,26 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ gyms, setGyms, bookings
                     <span className="font-mono text-xs uppercase font-bold text-gray-400">Add Hero image</span>
                     <input type="file" className="hidden" accept="image/*" onChange={handleHeroFileUpload} disabled={isUploadingHero} />
                   </label>
+
+                  <div className="pt-6 border-t-2 border-gray-100 flex items-center justify-between">
+                    <div>
+                      <h4 className="font-black uppercase text-sm">White Gradient Filter</h4>
+                      <p className="font-mono text-xs text-gray-500 mt-1">Applies a fading white overlay on the hero images to make black text legible.</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        className="sr-only peer" 
+                        checked={heroFilterEnabled} 
+                        onChange={async (e) => {
+                          const val = e.target.checked;
+                          setHeroFilterEnabled(val);
+                          await updateSystemSetting('hero_filter_enabled', val.toString());
+                        }} 
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-blue"></div>
+                    </label>
+                  </div>
                 </div>
               </div>
             </BlockTable>
@@ -725,8 +796,35 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ gyms, setGyms, bookings
                   <label className="block font-mono text-[10px] uppercase font-bold text-gray-400 mb-2">PromptPay Number</label>
                   <input type="text" value={promptPayNumber} onChange={e => setPromptPayNumber(e.target.value)} className="w-full border-2 border-brand-charcoal p-3 font-mono text-lg" placeholder="08X-XXX-XXXX" />
                 </div>
+
+                <div className="pt-6 border-t-2 border-brand-charcoal/10">
+                  <h4 className="font-black uppercase text-sm mb-4">Legal & Support Pages Content</h4>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block font-mono text-[10px] uppercase font-bold text-gray-400 mb-2">Privacy Policy</label>
+                      <textarea value={legalPrivacyPolicy} onChange={e => setLegalPrivacyPolicy(e.target.value)} className="w-full border-2 border-brand-charcoal p-3 font-mono text-xs h-32" placeholder="Leave empty to use default text..."></textarea>
+                    </div>
+                    <div>
+                      <label className="block font-mono text-[10px] uppercase font-bold text-gray-400 mb-2">Terms of Service</label>
+                      <textarea value={legalTermsOfService} onChange={e => setLegalTermsOfService(e.target.value)} className="w-full border-2 border-brand-charcoal p-3 font-mono text-xs h-32" placeholder="Leave empty to use default text..."></textarea>
+                    </div>
+                    <div>
+                      <label className="block font-mono text-[10px] uppercase font-bold text-gray-400 mb-2">Refund Policy</label>
+                      <textarea value={legalRefundPolicy} onChange={e => setLegalRefundPolicy(e.target.value)} className="w-full border-2 border-brand-charcoal p-3 font-mono text-xs h-32" placeholder="Leave empty to use default text..."></textarea>
+                    </div>
+                    <div>
+                      <label className="block font-mono text-[10px] uppercase font-bold text-gray-400 mb-2">Cancellation Policy</label>
+                      <textarea value={legalCancellationPolicy} onChange={e => setLegalCancellationPolicy(e.target.value)} className="w-full border-2 border-brand-charcoal p-3 font-mono text-xs h-32" placeholder="Leave empty to use default text..."></textarea>
+                    </div>
+                    <div>
+                      <label className="block font-mono text-[10px] uppercase font-bold text-gray-400 mb-2">Contact Information</label>
+                      <textarea value={legalContact} onChange={e => setLegalContact(e.target.value)} className="w-full border-2 border-brand-charcoal p-3 font-mono text-xs h-32" placeholder="Leave empty to use default text..."></textarea>
+                    </div>
+                  </div>
+                </div>
+
                 <button onClick={handleSaveSettings} disabled={isSettingsLoading} className="bg-brand-charcoal text-white font-black uppercase py-4 px-10 hover:bg-brand-red transition-all">
-                  {isSettingsLoading ? 'Saving...' : 'Update Config'}
+                  {isSettingsLoading ? 'Saving...' : 'Update Settings'}
                 </button>
               </div>
             </BlockTable>
