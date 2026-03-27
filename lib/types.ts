@@ -141,7 +141,7 @@ export interface ShopOrder {
   id: string;
   userId: string;
   totalAmount: number;
-  status: 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled';
+  status: 'payment_pending' | 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled';
   shippingAddress?: string;
   contactDetails?: string;
   paymentMethod?: string;

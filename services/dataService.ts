@@ -836,10 +836,11 @@ export const deleteCourse = async (id: string) => {
 // ----------------------------------------------------------------------------
 // STRIPE CHECKOUT INTEGRATION
 // ----------------------------------------------------------------------------
-export const createBookingCheckoutSession = async (bookingId: string, successUrl: string, cancelUrl: string, paymentMethods?: string[]) => {
+export const createBookingCheckoutSession = async (bookingId: string | string[], successUrl: string, cancelUrl: string, paymentMethods?: string[], totalPrice?: number) => {
     const { data, error } = await supabase.functions.invoke('stripe-checkout', {
         body: {
             orderId: bookingId,
+            totalPrice,
             type: 'booking',
             successUrl,
             cancelUrl,

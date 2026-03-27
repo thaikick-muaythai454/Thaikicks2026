@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Check, X, Users, DollarSign, Activity, Megaphone, Trash2, Edit, Plus, UserPlus, Calendar, Clock, BookOpen, Layers, ShoppingBag, Package } from 'lucide-react';
+import { Shield, Check, X, Users, DollarSign, Activity, Megaphone, Trash2, Edit, Plus, UserPlus, Calendar, Clock, BookOpen, Layers, ShoppingBag, Package, RotateCcw } from 'lucide-react';
 import { USERS } from '../lib/auth-data';
 import { Booking, AffiliateApplication, Announcement, Gym, Trainer, TrainerSchedule, User, Course, Product } from '../lib/types';
 import { createAnnouncement, deleteAnnouncement, getAnnouncements, createGym, updateGym, deleteGym, getGyms, createTrainer, deleteTrainer, getTrainerSchedules, createTrainerSchedule, deleteTrainerSchedule, getAllUsers, getCourses, createCourse, updateCourse, deleteCourse, getSystemSetting, updateSystemSetting, updateUserRole, getAffiliateApplications, updateAffiliateApplicationStatus, updateUserAffiliateStatus, updateGymApprovalStatus } from '../services/dataService';
@@ -447,11 +447,36 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ gyms, setGyms, bookings
       alert("Failed to remove hero image: " + (err.message || String(err)));
     }
   };
+  
+  const [isRefunding, setIsRefunding] = useState<string | null>(null);
+  const handleRefund = async (bookingId: string) => {
+    if (!confirm("Are you sure you want to REFUND this transaction? This will refund the full amount associated with this payment intent in Stripe.")) return;
+    
+    setIsRefunding(bookingId);
+    try {
+      const { supabase } = await import('../lib/supabaseClient');
+      const { data, error } = await supabase.functions.invoke('stripe-refund', {
+        body: { bookingId }
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      alert(`Refund successful! Refund ID: ${data.refundId}`);
+      // Refresh bookings via some mechanism or just reload
+      window.location.reload(); 
+    } catch (err: any) {
+      console.error(err);
+      alert("Refund failed: " + (err.message || String(err)));
+    } finally {
+      setIsRefunding(null);
+    }
+  };
 
   const [filterDateFrom, setFilterDateFrom] = React.useState('');
   const [filterDateTo, setFilterDateTo] = React.useState('');
   const [filterGymId, setFilterGymId] = React.useState('all');
-  const [filterStatus, setFilterStatus] = React.useState('all');
+  const [filterStatus, setFilterStatus] = React.useState('confirmed'); // Start with confirmed as default
 
   const filteredBookings = bookings.filter(b => {
     const matchFrom = !filterDateFrom || b.date >= filterDateFrom;
@@ -461,8 +486,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ gyms, setGyms, bookings
     return matchFrom && matchTo && matchGym && matchStatus;
   });
 
-  const totalRevenue = filteredBookings.reduce((sum, b) => sum + b.totalPrice, 0);
-  const totalCommission = filteredBookings.reduce((sum, b) => sum + (b.commissionAmount || 0), 0);
+  // Revenue should ONLY reflect Paid/Confirmed bookings to avoid misleading stats
+  const paidBookings = filteredBookings.filter(b => b.status === 'confirmed' || b.status === 'completed');
+  const totalRevenue = paidBookings.reduce((sum, b) => sum + b.totalPrice, 0);
+  const totalCommission = paidBookings.reduce((sum, b) => sum + (b.commissionAmount || 0), 0);
   const totalNet = totalRevenue - totalCommission;
 
   type GymPerf = { name: string; bookings: number; revenue: number; commission: number };
@@ -621,6 +648,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ gyms, setGyms, bookings
           <button onClick={() => setActiveTab('announcements')} className={`w-full text-left px-4 py-3 font-mono text-xs font-bold uppercase transition-colors flex items-center gap-3 ${activeTab === 'announcements' ? 'bg-brand-charcoal text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'}`}>
             <Megaphone className="w-4 h-4" /> Broadcast News
           </button>
+          <button onClick={() => setActiveTab('bookings')} className={`w-full text-left px-4 py-3 font-mono text-xs font-bold uppercase transition-colors flex items-center gap-3 ${activeTab === 'bookings' ? 'bg-brand-charcoal text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'}`}>
+            <Calendar className="w-4 h-4" /> Manage Bookings
+          </button>
           <button onClick={() => navigate('/admin/users')} className="w-full text-left px-4 py-3 font-mono text-xs font-bold uppercase transition-colors flex items-center gap-3 bg-gray-50 text-gray-600 hover:bg-brand-red hover:text-white">
             <Users className="w-4 h-4" /> User Management
           </button>
@@ -714,6 +744,74 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ gyms, setGyms, bookings
                     <button onClick={() => handleDeleteNews(a.id)} className="text-gray-300 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
                   </div>
                 ))}
+              </div>
+            </BlockTable>
+          )}
+
+          {activeTab === 'bookings' && (
+            <BlockTable title="Booking Management" icon={<Calendar className="w-4 h-4" />}>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse min-w-[800px]">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-100">
+                      <th className="p-4 text-left font-mono text-[10px] uppercase text-gray-400">Date/ID</th>
+                      <th className="p-4 text-left font-mono text-[10px] uppercase text-gray-400">Customer</th>
+                      <th className="p-4 text-left font-mono text-[10px] uppercase text-gray-400">Gym/Type</th>
+                      <th className="p-4 text-left font-mono text-[10px] uppercase text-gray-400">Total</th>
+                      <th className="p-4 text-left font-mono text-[10px] uppercase text-gray-400">Status</th>
+                      <th className="p-4 text-center font-mono text-[10px] uppercase text-gray-400">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {filteredBookings.length === 0 ? (
+                      <tr><td colSpan={6} className="p-12 text-center font-mono text-xs text-gray-400">NO BOOKINGS MATCHING FILTERS</td></tr>
+                    ) : (
+                      filteredBookings.map(b => (
+                        <tr key={b.id} className="hover:bg-brand-bone transition-colors group">
+                          <td className="p-4">
+                            <div className="font-bold text-xs uppercase">{b.date}</div>
+                            <div className="font-mono text-[9px] text-gray-400">#{b.id.slice(0, 8)}</div>
+                          </td>
+                          <td className="p-4">
+                            <div className="font-bold text-xs uppercase">{b.userName}</div>
+                            <div className="font-mono text-[9px] text-gray-400">{b.userEmail || 'no-email@thaikicks.com'}</div>
+                          </td>
+                          <td className="p-4">
+                            <div className="font-bold text-xs uppercase">{b.gymName}</div>
+                            <div className="font-mono text-[9px] text-gray-500 uppercase">{b.type}</div>
+                          </td>
+                          <td className="p-4 font-mono text-sm font-bold">฿{b.totalPrice.toLocaleString()}</td>
+                          <td className="p-4">
+                            <span className={`px-2 py-0.5 font-mono text-[9px] font-black uppercase shadow-sm ${
+                              b.status === 'confirmed' ? 'bg-green-100 text-green-700' : 
+                              b.status === 'cancelled' ? 'bg-red-100 text-red-700' : 
+                              'bg-gray-100 text-gray-500'
+                            }`}>
+                              {b.status}
+                            </span>
+                          </td>
+                          <td className="p-4 text-center">
+                            {b.status === 'confirmed' && (
+                              <button 
+                                onClick={() => handleRefund(b.id)}
+                                disabled={isRefunding === b.id}
+                                className="flex items-center gap-1 mx-auto bg-brand-red text-white px-3 py-1 text-[10px] font-bold uppercase hover:bg-brand-charcoal transition-colors disabled:opacity-50"
+                                title="Refund this payment"
+                              >
+                                {isRefunding === b.id ? (
+                                  <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                ) : (
+                                  <RotateCcw className="w-3 h-3" />
+                                )}
+                                Refund
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
             </BlockTable>
           )}

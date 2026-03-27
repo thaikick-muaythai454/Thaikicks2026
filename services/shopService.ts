@@ -259,6 +259,7 @@ export const createShopOrder = async (order: {
     shippingAddress?: string;
     contactDetails?: string;
     paymentMethod?: string;
+    status?: ShopOrder['status'];
     items: { productId: string; quantity: number; priceAtPurchase: number }[];
 }) => {
     // Create order
@@ -270,7 +271,7 @@ export const createShopOrder = async (order: {
             shipping_address: order.shippingAddress,
             contact_details: order.contactDetails,
             payment_method: order.paymentMethod,
-            status: 'pending'
+            status: order.status || 'payment_pending'
         })
         .select()
         .single();

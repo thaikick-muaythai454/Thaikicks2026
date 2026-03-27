@@ -367,7 +367,8 @@ const ShopOrdersSection: React.FC<{ userId: string }> = ({ userId }) => {
     try {
       const { getShopOrdersByUser } = await import('./services/shopService');
       const data = await getShopOrdersByUser(userId);
-      setOrders(data);
+      // Only show paid/confirmed orders or manual pending orders in the history record
+      setOrders(data.filter((o: any) => o.status !== 'payment_pending'));
     } catch (error) {
       console.error('Failed to load orders', error);
     } finally {
@@ -377,6 +378,7 @@ const ShopOrdersSection: React.FC<{ userId: string }> = ({ userId }) => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
+      case 'payment_pending': return 'bg-amber-100 text-amber-700';
       case 'pending': return 'bg-yellow-100 text-yellow-700';
       case 'paid': return 'bg-blue-100 text-blue-700';
       case 'shipped': return 'bg-purple-100 text-purple-700';
@@ -431,7 +433,7 @@ const ShopOrdersSection: React.FC<{ userId: string }> = ({ userId }) => {
               </div>
             )}
 
-            {order.status === 'pending' && order.paymentStatus !== 'paid' && (
+            {(order.status === 'pending' || order.status === 'payment_pending') && order.paymentStatus !== 'paid' && (
               <div className="mt-3 flex flex-col gap-2">
                 <div className="flex items-center gap-2 text-[10px] font-mono text-amber-600 uppercase font-bold">
                   <span className="inline-block w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
@@ -472,8 +474,8 @@ const CustomerDashboard: React.FC<{ user: User; bookings: Booking[]; requestAffi
   const [avatarFile, setAvatarFile] = React.useState<File | null>(null);
   const [isSavingProfile, setIsSavingProfile] = React.useState(false);
 
-  // Filter bookings for this user
-  const myBookings = bookings.filter(b => b.userId === user.id);
+  // Filter bookings for this user - ONLY SHOW PAID/CONFIRMED ones
+  const myBookings = bookings.filter(b => b.userId === user.id && (b.status === 'confirmed' || b.status === 'completed'));
 
   // Sort by date (newest first)
   const sortedBookings = [...myBookings].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -986,6 +988,8 @@ const App: React.FC = () => {
       }
     };
 
+
+    
 
 
     // Initialize

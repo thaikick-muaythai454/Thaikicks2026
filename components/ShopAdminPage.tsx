@@ -61,6 +61,7 @@ const ShopAdminPage: React.FC = () => {
 
     const getStatusColor = (status: string) => {
         switch (status) {
+            case 'payment_pending': return 'bg-amber-50 text-amber-600 border-amber-200';
             case 'pending': return 'bg-yellow-100 text-yellow-700 border-yellow-300';
             case 'paid': return 'bg-blue-100 text-blue-700 border-blue-300';
             case 'shipped': return 'bg-purple-100 text-purple-700 border-purple-300';
@@ -132,10 +133,15 @@ const ShopAdminPage: React.FC = () => {
 
                 {activeTab === 'orders' && (() => {
                     const filteredOrders = orders.filter(order => {
-                        const matchStatus = filterStatus === 'all' || order.status === filterStatus;
+                        // EXCLUDE payment_pending by default in "All" view to satisfy user request "order should only show after payment"
+                        const matchStatus = filterStatus === 'all' 
+                            ? (order.status !== 'payment_pending') // Hide by default
+                            : order.status === filterStatus;       // Show specifically if selected
+
                         const contactDetails = order.contactDetails ? JSON.parse(order.contactDetails) : {};
                         const searchString = `${order.id} ${contactDetails.name || ''} ${contactDetails.email || ''}`.toLowerCase();
                         const matchSearch = searchString.includes(searchQuery.toLowerCase());
+                        
                         return matchStatus && matchSearch;
                     });
 
@@ -161,7 +167,8 @@ const ShopAdminPage: React.FC = () => {
                                             onChange={(e) => setFilterStatus(e.target.value)}
                                         >
                                             <option value="all">ALL STATUS</option>
-                                            <option value="pending">PENDING</option>
+                                            <option value="payment_pending">PAYMENT PENDING (UNPAID)</option>
+                                            <option value="pending">PENDING (VERIFICATION)</option>
                                             <option value="paid">PAID</option>
                                             <option value="shipped">SHIPPED</option>
                                             <option value="delivered">DELIVERED</option>
@@ -222,6 +229,7 @@ const ShopAdminPage: React.FC = () => {
                                                             onChange={(e) => handleStatusUpdate(order.id, e.target.value as ShopOrder['status'])}
                                                             className="border border-gray-300 px-3 py-1 text-xs font-mono uppercase focus:outline-none focus:border-brand-blue"
                                                         >
+                                                            <option value="payment_pending">Payment Pending</option>
                                                             <option value="pending">Pending</option>
                                                             <option value="paid">Paid</option>
                                                             <option value="shipped">Shipped</option>
