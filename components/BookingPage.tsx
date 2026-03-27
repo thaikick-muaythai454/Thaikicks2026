@@ -318,10 +318,11 @@ const BookingPage: React.FC<BookingPageProps> = ({ gyms, user, setBookings }) =>
                 setBookings(prev => [...prev, ...flattened]);
             }
 
-            // For checkout, we use the ID of the first created booking to represent the session
-            mainBookingId = createdBookings[0]?.id;
+            // For checkout, we use all created booking IDs to ensure Stripe charges the correct total
+            const allBookingIds = createdBookings.map(b => b.id);
+            mainBookingId = allBookingIds[0]; // Kept for metadata/logging if needed
 
-            if (mainBookingId) {
+            if (allBookingIds.length > 0) {
                 // Save fake receipt data to local storage for the success page to pick up (since it reads from shop format)
                 localStorage.setItem('thaikick_last_order', JSON.stringify({
                     id: mainBookingId,
@@ -340,7 +341,7 @@ const BookingPage: React.FC<BookingPageProps> = ({ gyms, user, setBookings }) =>
                 const cancelUrl = window.location.href;
 
                 try {
-                    const checkoutUrl = await createBookingCheckoutSession(mainBookingId, successUrl, cancelUrl, [paymentMethod]);
+                    const checkoutUrl = await createBookingCheckoutSession(allBookingIds, successUrl, cancelUrl, [paymentMethod], total);
                     window.location.href = checkoutUrl;
                     return; 
                 } catch (stripeErr) {

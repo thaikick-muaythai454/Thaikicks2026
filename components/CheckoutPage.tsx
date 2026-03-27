@@ -46,29 +46,10 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ user }) => {
         setIsProcessing(true);
 
         try {
-            const orderData = {
-                userId: user.id,
-                totalAmount: cartTotal,
-                shippingAddress: formData.address,
-                contactDetails: JSON.stringify({
-                    name: formData.name,
-                    email: formData.email,
-                    phone: formData.phone,
-                    affiliateCode: formData.affiliateCode || null
-                }),
-                paymentMethod: formData.paymentMethod,
-                items: cart.map(item => ({
-                    productId: item.id,
-                    quantity: item.quantity,
-                    priceAtPurchase: item.price
-                }))
-            };
-
-            const createdOrder = await createShopOrder(orderData);
-
-            // Save order data for receipt display (temporary)
+            // Save order data for receipt display (temporary/local)
+            const draftId = `TK_${Date.now().toString(36).toUpperCase()}`;
             const receiptData = {
-                id: createdOrder?.id || `ORDER_${Date.now()}`,
+                id: draftId,
                 date: new Date().toLocaleDateString('en-US', {
                     year: 'numeric',
                     month: 'short',
@@ -86,10 +67,29 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ user }) => {
             };
             localStorage.setItem('thaikick_last_order', JSON.stringify(receiptData));
 
-            // ── PRODUCTION: Stripe Checkout ────────────────────────────────
-            const { data: { url: sessionUrl }, error: stripeError } = await supabase.functions.invoke('stripe-checkout', {
+            // Determine Stripe payment methods (always include promptpay for TH market)
+            const paymentMethods = formData.paymentMethod === 'promptpay' ? ['promptpay'] : ['card', 'promptpay'];
+            
+            // ── PRODUCTION: Stripe Checkout (NO ORDER CREATED YET) ──────────────────
+            const { data: stripeData, error: stripeError } = await supabase.functions.invoke('stripe-checkout', {
                 body: {
-                    orderId: createdOrder.id,
+                    orderData: {
+                        userId: user.id,
+                        items: cart.map(item => ({
+                            productId: item.id,
+                            quantity: item.quantity,
+                            priceAtPurchase: item.price,
+                            name: item.name
+                        })),
+                        shippingAddress: formData.address,
+                        contactDetails: {
+                            name: formData.name,
+                            email: formData.email,
+                            phone: formData.phone,
+                            affiliateCode: formData.affiliateCode || null
+                        }
+                    },
+                    paymentMethods,
                     successUrl: `${window.location.origin}/#/checkout-success`,
                     cancelUrl: `${window.location.origin}/#/checkout`,
                     type: 'shop'
@@ -98,20 +98,18 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ user }) => {
 
             if (stripeError) throw stripeError;
 
-            // Clear cart
+            // Clear cart only AFTER successful session creation
             localStorage.removeItem('thaikick_cart');
             setCart([]);
 
-            // Redirect to Stripe Checkout
-            if (sessionUrl) {
-                window.location.href = sessionUrl;
+            if (stripeData?.url) {
+                window.location.href = stripeData.url;
             } else {
                 navigate('/checkout-success');
             }
-            // ── END PRODUCTION ────────────────────────────────────────────────
         } catch (error) {
             console.error('Order failed:', error);
-            alert('Failed to create order. Please try again.');
+            alert('Failed to initiate payment. Please try again.');
         } finally {
             setIsProcessing(false);
         }
@@ -265,8 +263,8 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ user }) => {
                                             className="w-4 h-4"
                                         />
                                         <div className="flex-1">
-                                            <div className="font-bold text-sm uppercase">Bank Transfer</div>
-                                            <div className="font-mono text-xs text-gray-500">Transfer to our bank account</div>
+                                            <div className="font-bold text-sm uppercase">Bank Transfer (PromptPay)</div>
+                                            <div className="font-mono text-xs text-gray-500">Scan QR via Mobile Banking</div>
                                         </div>
                                     </label>
                                 </div>

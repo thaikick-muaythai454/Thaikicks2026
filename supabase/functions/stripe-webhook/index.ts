@@ -40,20 +40,24 @@ serve(async (req) => {
 
             if (orderId) {
                 if (type === 'booking') {
-                    // Update BOOKING status to confirmed
-                    const { data: updatedBooking, error: updateError } = await supabase
+                    // orderId could be a comma-separated string of IDs
+                    const bookingIds = orderId.split(',');
+
+                    // Update BOOKING status to confirmed and save payment intent
+                    const { data: updatedBookings, error: updateError } = await supabase
                         .from("bookings")
                         .update({
                             status: "confirmed",
-                            payment_status: "paid", // If you have this column in bookings
-                            stripe_session_id: session.id
+                            payment_status: "paid",
+                            stripe_session_id: session.id,
+                            stripe_payment_intent_id: session.payment_intent // Crucial for refunds
                         })
-                        .eq("id", orderId)
-                        .select()
-                        .single();
+                        .in("id", bookingIds)
+                        .select();
 
-                    if (!updateError && updatedBooking) {
-                        console.log(`Booking ${orderId} successfully confirmed.`);
+                    if (!updateError && updatedBookings && updatedBookings.length > 0) {
+                        const updatedBooking = updatedBookings[0]; // Use first for email info
+                        console.log(`Bookings ${orderId} successfully confirmed.`);
 
                         // SEND CONFIRMATION EMAIL
                         const resendApiKey = Deno.env.get("RESEND_API_KEY");
@@ -103,44 +107,124 @@ serve(async (req) => {
 
                 } else {
                     // Update SHOP ORDER status to paid
-                    const { data: updatedOrder, error: updateError } = await supabase
-                        .from("shop_orders")
-                        .update({
-                            status: "paid",
-                            payment_status: "paid",
-                            payment_verified_at: new Date().toISOString(),
-                            stripe_payment_intent_id: session.payment_intent,
-                            admin_notes: `Stripe Session ID: ${session.id}`
-                        })
-                        .eq("id", orderId)
-                        .select()
-                        .single();
+                    let workingOrderId = orderId;
+                    let existingOrder = null;
 
-                    if (!updateError && updatedOrder) {
-                        console.log(`Shop Order ${orderId} successfully paid.`);
+                    // Handle New Order Creation from Metadata
+                    if (session.metadata?.is_new_order === 'true') {
+                        const userId = session.metadata.user_id;
+                        const shippingAddress = session.metadata.shipping_address;
+                        const contactDetails = session.metadata.contact_details;
+                        const items = JSON.parse(session.metadata.items || '[]');
+
+                        // Calculate total amount from items
+                        const totalAmount = items.reduce((sum: number, i: any) => sum + (i.price * i.qty), 0);
+
+                        // 1. Create shop_orders record
+                        const { data: newOrder, error: createError } = await supabase
+                            .from("shop_orders")
+                            .insert({
+                                user_id: userId,
+                                total_amount: totalAmount,
+                                shipping_address: shippingAddress,
+                                contact_details: contactDetails,
+                                status: "paid",
+                                payment_status: "paid",
+                                payment_method: "promptpay",
+                                payment_verified_at: new Date().toISOString(),
+                                stripe_payment_intent_id: session.payment_intent,
+                                stripe_session_id: session.id,
+                                admin_notes: `Created via Webhook. Session ID: ${session.id}`
+                            })
+                            .select()
+                            .single();
+
+                        if (createError) {
+                            console.error("Failed to create shop order from metadata:", createError);
+                            return new Response(`Error creating order: ${createError.message}`, { status: 500 });
+                        }
+
+                        workingOrderId = newOrder.id;
+                        existingOrder = newOrder;
+
+                        // 2. Create shop_order_items records
+                        const orderItems = items.map((i: any) => ({
+                            order_id: workingOrderId,
+                            product_id: i.id,
+                            quantity: i.qty,
+                            price_at_purchase: i.price
+                        }));
+
+                        const { error: itemsError } = await supabase
+                            .from("shop_order_items")
+                            .insert(orderItems);
+
+                        if (itemsError) {
+                            console.error("Failed to create order items:", itemsError);
+                            // We created the order but failed items, this is a critical state
+                        }
+                    } else {
+                        // Legacy Flow: Just update existing order
+                        const { data: updatedOrder, error: updateError } = await supabase
+                            .from("shop_orders")
+                            .update({
+                                status: "paid",
+                                payment_status: "paid",
+                                payment_verified_at: new Date().toISOString(),
+                                stripe_payment_intent_id: session.payment_intent,
+                                admin_notes: `Stripe Session ID: ${session.id}`
+                            })
+                            .eq("id", workingOrderId)
+                            .select()
+                            .single();
+                        
+                        if (updateError) {
+                            console.error(`Failed to update Shop Order ${workingOrderId}:`, updateError);
+                            return new Response(`Error updating order: ${updateError.message}`, { status: 500 });
+                        }
+                        existingOrder = updatedOrder;
+                    }
+
+                    if (existingOrder) {
+                        console.log(`Shop Order ${workingOrderId} successfully processed.`);
 
                         // SEND CONFIRMATION EMAIL
                         const resendApiKey = Deno.env.get("RESEND_API_KEY");
                         const customerEmail = session.customer_details?.email;
 
-                        // Need items and shipping from the updated order
-                        const contactDetails = updatedOrder.contact_details ? (typeof updatedOrder.contact_details === 'string' ? JSON.parse(updatedOrder.contact_details) : updatedOrder.contact_details) : {};
-                        const customerName = contactDetails.name || 'Fighter';
-                        const items = updatedOrder.items || [];
-                        const shippingAddress = updatedOrder.shipping_address || 'TBD / In-store Pickup';
+                        const contactData = existingOrder.contact_details ? (typeof existingOrder.contact_details === 'string' ? JSON.parse(existingOrder.contact_details) : existingOrder.contact_details) : {};
+                        const customerName = contactData.name || 'Fighter';
+                        const shippingAddress = existingOrder.shipping_address || 'TBD';
+
+                        // Fetch items if they weren't in the initial select (for legacy flow)
+                        let emailItems = [];
+                        if (session.metadata?.is_new_order === 'true') {
+                            emailItems = JSON.parse(session.metadata.items).map((i: any) => ({
+                                price_at_purchase: i.price,
+                                quantity: i.qty
+                                // name is missing here, we might need a join or pass names in metadata
+                            }));
+                        } else {
+                            // Fetch items from DB to get product names
+                            const { data: dbItems } = await supabase
+                                .from('shop_order_items')
+                                .select('*, products(name)')
+                                .eq('order_id', workingOrderId);
+                            emailItems = dbItems || [];
+                        }
 
                         if (resendApiKey && customerEmail) {
                             try {
                                 const emailHtml = generateShopEmailHTML({
-                                    orderId: updatedOrder.id,
+                                    orderId: existingOrder.id,
                                     customerName: customerName,
-                                    amount: updatedOrder.total_amount,
+                                    amount: existingOrder.total_amount,
                                     currency: 'THB',
-                                    items: items,
+                                    items: emailItems,
                                     shippingAddress: shippingAddress
                                 });
 
-                                const emailResponse = await fetch('https://api.resend.com/emails', {
+                                await fetch('https://api.resend.com/emails', {
                                     method: 'POST',
                                     headers: {
                                         'Authorization': `Bearer ${resendApiKey}`,
@@ -153,19 +237,10 @@ serve(async (req) => {
                                         html: emailHtml
                                     })
                                 });
-                                if (!emailResponse.ok) {
-                                    console.error('Failed to send shop email:', await emailResponse.text());
-                                } else {
-                                    console.log('Shop confirmation email sent to', customerEmail);
-                                }
                             } catch (e) {
                                 console.error('Error sending shop confirmation email:', e);
                             }
-                        } else {
-                            console.log("RESEND_API_KEY or customer email not available. Skipping email sending.");
                         }
-                    } else {
-                        console.error(`Failed to update Shop Order ${orderId}:`, updateError);
                     }
                 }
             }

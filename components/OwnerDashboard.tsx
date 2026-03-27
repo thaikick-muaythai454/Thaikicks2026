@@ -84,8 +84,8 @@ const OwnerDashboard: React.FC<OwnerDashboardProps> = ({ user, gyms, updateGym, 
 
     // --- Methods ---
 
-    // Filter bookings for this gym
-    const gymBookings = bookings.filter(b => b.gymId === myGym?.id);
+    // Filter bookings for this gym - ONLY showing confirmed/paid ones as per business rule
+    const gymBookings = bookings.filter(b => b.gymId === myGym?.id && (b.status === 'confirmed' || b.status === 'completed'));
     const totalRevenue = gymBookings.reduce((sum, b) => sum + (b.totalPrice || 0), 0);
 
     // Filter by date
