@@ -989,6 +989,8 @@ const App: React.FC = () => {
     };
 
 
+    
+
 
     // Initialize
     supabase.auth.getSession().then(({ data: { session } }) => {
