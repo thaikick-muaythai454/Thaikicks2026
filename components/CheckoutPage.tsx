@@ -97,6 +97,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ user }) => {
             });
 
             if (stripeError) throw stripeError;
+            if (stripeData?.error) throw new Error(stripeData.error);
 
             // Clear cart only AFTER successful session creation
             localStorage.removeItem('thaikick_cart');
@@ -107,9 +108,9 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ user }) => {
             } else {
                 navigate('/checkout-success');
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Order failed:', error);
-            alert('Failed to initiate payment. Please try again.');
+            alert(`Failed to initiate payment: ${error.message || 'Please try again.'}`);
         } finally {
             setIsProcessing(false);
         }

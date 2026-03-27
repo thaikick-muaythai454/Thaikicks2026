@@ -47,7 +47,7 @@ serve(async (req) => {
             const orderId = session.metadata?.order_id;
             const type = session.metadata?.type || 'shop'; // Default to shop for backward compatibility
 
-            if (orderId) {
+            if (orderId || session.metadata?.is_new_order === 'true') {
                 if (type === 'booking') {
                     // orderId could be a comma-separated string of IDs
                     const bookingIds = orderId.split(',');

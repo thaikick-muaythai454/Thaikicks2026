@@ -122,6 +122,13 @@ serve(async (req) => {
         }
 
         // 3. Create Stripe Checkout Session
+        // Ensure metadata values are under 500 characters
+        for (const key in metadata) {
+            if (metadata[key] && metadata[key].length > 490) {
+                metadata[key] = metadata[key].substring(0, 490) + '...';
+            }
+        }
+
         const session = await stripe.checkout.sessions.create({
             payment_method_types: paymentMethods || ["card", "promptpay"],
             line_items,
@@ -147,9 +154,10 @@ serve(async (req) => {
         });
     } catch (error) {
         console.error("Function error:", error);
+        // Return 200 with the error so client doesn't throw raw HTTP error
         return new Response(JSON.stringify({ error: error.message }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
-            status: 400,
+            status: 200,
         });
     }
 });
