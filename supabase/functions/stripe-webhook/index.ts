@@ -11,7 +11,16 @@ const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
 
 const endpointSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
 
+const corsHeaders = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-version, stripe-signature",
+};
+
 serve(async (req) => {
+    if (req.method === "OPTIONS") {
+        return new Response("ok", { headers: corsHeaders });
+    }
+
     const signature = req.headers.get("stripe-signature");
 
     if (!signature) {
