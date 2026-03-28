@@ -68,6 +68,40 @@ serve(async (req) => {
                         const updatedBooking = updatedBookings[0]; // Use first for email info
                         console.log(`Bookings ${orderId} successfully confirmed.`);
 
+                        // Process Affiliate Commissions for Bookings
+                        try {
+                            // Sum commission from all bookings that have an affiliate code
+                            const bookingsWithAffiliate = updatedBookings.filter(
+                                (b: any) => b.commission_paid_to && b.commission_amount > 0
+                            );
+
+                            if (bookingsWithAffiliate.length > 0) {
+                                const affiliateCode = bookingsWithAffiliate[0].commission_paid_to;
+                                const totalCommission = bookingsWithAffiliate.reduce(
+                                    (sum: number, b: any) => sum + (b.commission_amount || 0), 0
+                                );
+
+                                // Find the affiliate user by code
+                                const { data: affiliateUser } = await supabase
+                                    .from('users')
+                                    .select('id, affiliate_earnings, affiliate_status')
+                                    .ilike('affiliate_code', affiliateCode)
+                                    .single();
+
+                                if (affiliateUser && affiliateUser.affiliate_status === 'active') {
+                                    await supabase
+                                        .from('users')
+                                        .update({
+                                            affiliate_earnings: (affiliateUser.affiliate_earnings || 0) + totalCommission
+                                        })
+                                        .eq('id', affiliateUser.id);
+                                    console.log(`Credited ${totalCommission} THB to affiliate ${affiliateCode} from booking`);
+                                }
+                            }
+                        } catch (affErr) {
+                            console.error('Error processing booking affiliate commission:', affErr);
+                        }
+
                         // SEND CONFIRMATION EMAIL
                         const resendApiKey = Deno.env.get("RESEND_API_KEY");
                         if (resendApiKey) {
