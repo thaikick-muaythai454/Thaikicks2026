@@ -19,45 +19,93 @@ serve(async (req) => {
     }
 
     try {
-        const { orderId, orderData, totalPrice, successUrl, cancelUrl, type = 'shop', paymentMethods } = await req.json();
+        const { orderId, orderData, bookingData, totalPrice, successUrl, cancelUrl, type = 'shop', paymentMethods } = await req.json();
 
+        // 1. Initialize Supabase Admin Client
         const supabase = createClient(
             Deno.env.get("SUPABASE_URL") ?? "",
             Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
         );
 
+        // 2. VERIFY AUTHENTICATION (CRITICAL)
+        const authHeader = req.headers.get('Authorization');
+        if (!authHeader) throw new Error("No authorization header");
+
+        const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
+        if (authError || !user) throw new Error("Unauthorized: Invalid token");
+
+        // 3. VALIDATE USER OWNERSHIP
+        const targetUserId = bookingData?.userId || orderData?.userId;
+        if (targetUserId && targetUserId !== user.id) {
+            throw new Error("Unauthorized: Cannot create session for another user");
+        }
+
         let line_items = [];
         let metadata: Record<string, string> = { type };
 
         if (type === 'booking') {
-            const orderIds = Array.isArray(orderId) ? orderId : [orderId];
-            const { data: bookings, error: bookingError } = await supabase
-                .from("bookings")
-                .select("*")
-                .in("id", orderIds);
-
-            if (bookingError || !bookings || bookings.length === 0) {
-                throw new Error(`Bookings not found: ${orderIds.join(', ')}`);
-            }
-
-            // Use provided totalPrice if available, otherwise sum from DB
-            const finalAmount = totalPrice || bookings.reduce((sum, b) => sum + (b.total_price || 0), 0);
-            const firstBooking = bookings[0];
-
-            line_items = [{
-                price_data: {
-                    currency: "thb",
-                    product_data: {
-                        name: `Booking at ${firstBooking.gym_name || 'Gym'}`,
-                        description: bookings.length > 1 
-                            ? `${firstBooking.type.toUpperCase()} - Multi-day Booking (${bookings.length} days)`
-                            : `${firstBooking.type.toUpperCase()} - ${firstBooking.date}`,
+            if (bookingData) {
+                // New Flow: No booking records yet
+                // SECURITY: Re-calculate or at least ensure user_id is the authenticated one
+                const amount = totalPrice || bookingData.totalPrice;
+                line_items = [{
+                    price_data: {
+                        currency: "thb",
+                        product_data: {
+                            name: `Booking at ${bookingData.gymName}`,
+                            description: bookingData.courseTitle || `${bookingData.type.toUpperCase()}: ${bookingData.startDate} to ${bookingData.endDate}`,
+                        },
+                        unit_amount: Math.round(amount * 100),
                     },
-                    unit_amount: Math.round(finalAmount * 100),
-                },
-                quantity: 1,
-            }];
-            metadata.order_id = orderIds.join(',');
+                    quantity: 1,
+                }];
+                metadata.is_new_booking = 'true';
+                metadata.user_id = bookingData.userId;
+                metadata.user_name = bookingData.userName;
+                metadata.gym_id = bookingData.gymId;
+                metadata.gym_name = bookingData.gymName;
+                metadata.start_date = bookingData.startDate;
+                metadata.end_date = bookingData.endDate;
+                metadata.booking_type = bookingData.type;
+                if (bookingData.trainerId) metadata.trainer_id = bookingData.trainerId;
+                if (bookingData.trainerName) metadata.trainer_name = bookingData.trainerName;
+                if (bookingData.startTime) metadata.start_time = bookingData.startTime;
+                if (bookingData.endTime) metadata.end_time = bookingData.endTime;
+                if (bookingData.courseId) metadata.course_id = bookingData.courseId;
+                if (bookingData.courseTitle) metadata.course_title = bookingData.courseTitle;
+                metadata.total_price = amount.toString();
+                if (bookingData.affiliateCode) metadata.affiliate_code = bookingData.affiliateCode;
+                metadata.affiliate_pct = (bookingData.affiliatePercentage || 0).toString();
+            } else {
+                const orderIds = Array.isArray(orderId) ? orderId : [orderId];
+                const { data: bookings, error: bookingError } = await supabase
+                    .from("bookings")
+                    .select("*")
+                    .in("id", orderIds);
+
+                if (bookingError || !bookings || bookings.length === 0) {
+                    throw new Error(`Bookings not found: ${orderIds.join(', ')}`);
+                }
+
+                // Use provided totalPrice if available, otherwise sum from DB
+                const finalAmount = totalPrice || bookings.reduce((sum, b) => sum + (b.total_price || 0), 0);
+                const firstBooking = bookings[0];
+
+                line_items = [{
+                    price_data: {
+                        currency: "thb",
+                        product_data: {
+                            name: `Booking at ${firstBooking.gym_name || 'Gym'}`,
+                            description: bookings.length > 1 
+                                ? `${firstBooking.type.toUpperCase()} - Multi-day Booking (${bookings.length} days)`
+                                : `${firstBooking.type.toUpperCase()} - ${firstBooking.date}`,
+                        },
+                        unit_amount: Math.round(finalAmount * 100),
+                    },
+                    quantity: 1,
+                }];
+                metadata.order_id = orderIds.join(',');
+            }
         } else if (orderData) {
             // New Flow: No order record yet
             line_items = orderData.items.map((item: any) => ({

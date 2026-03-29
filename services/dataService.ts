@@ -836,10 +836,21 @@ export const deleteCourse = async (id: string) => {
 // ----------------------------------------------------------------------------
 // STRIPE CHECKOUT INTEGRATION
 // ----------------------------------------------------------------------------
-export const createBookingCheckoutSession = async (bookingId: string | string[], successUrl: string, cancelUrl: string, paymentMethods?: string[], totalPrice?: number) => {
+export const createBookingCheckoutSession = async (bookingIdOrData: string | string[] | any, successUrl: string, cancelUrl: string, paymentMethods?: string[], totalPrice?: number) => {
+    const isNewBooking = typeof bookingIdOrData === 'object' && !Array.isArray(bookingIdOrData);
+    
+    // Explicitly Get Token for Security (though invoke should do it automatically, let's be sure)
+    const { data: { session } } = await supabase.auth.getSession();
+    const headers: any = {};
+    if (session?.access_token) {
+        headers.Authorization = `Bearer ${session.access_token}`;
+    }
+
     const { data, error } = await supabase.functions.invoke('stripe-checkout', {
+        headers,
         body: {
-            orderId: bookingId,
+            orderId: isNewBooking ? undefined : bookingIdOrData,
+            bookingData: isNewBooking ? bookingIdOrData : undefined,
             totalPrice,
             type: 'booking',
             successUrl,

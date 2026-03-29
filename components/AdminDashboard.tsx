@@ -492,7 +492,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ gyms, setGyms, bookings
     setIsRefunding(bookingId);
     try {
       const { supabase } = await import('../lib/supabaseClient');
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: any = {};
+      if (session?.access_token) {
+        headers.Authorization = `Bearer ${session.access_token}`;
+      }
+
       const { data, error } = await supabase.functions.invoke('stripe-refund', {
+        headers,
         body: { bookingId }
       });
 

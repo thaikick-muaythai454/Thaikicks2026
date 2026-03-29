@@ -511,12 +511,12 @@ const ShopOrdersSection: React.FC<{ userId: string }> = ({ userId }) => {
               )}
 
               {/* Refund Request Button */}
-              {(order.status === 'paid' || order.status === 'shipped') && !existingRefund && (
+              {(order.status === 'paid' || order.status === 'shipped') && (!existingRefund || existingRefund.status === 'rejected') && (
                 <button
                   onClick={() => setRefundModal({ orderId: order.id, orderType: 'shop', amount: order.totalAmount })}
                   className="mt-3 w-full border-2 border-brand-red text-brand-red py-2 px-4 font-mono text-xs uppercase font-bold hover:bg-brand-red hover:text-white transition-colors"
                 >
-                  ↩ ขอ Refund
+                  ↩ ขอ Refund {existingRefund?.status === 'rejected' && '(ขอใหม่)'}
                 </button>
               )}
 
@@ -872,12 +872,12 @@ const CustomerDashboard: React.FC<{ user: User; bookings: Booking[]; requestAffi
                       </div>
 
                       {/* Refund Button for Bookings */}
-                      {b.status === 'confirmed' && !existingRefund && (
+                      {b.status === 'confirmed' && (!existingRefund || existingRefund.status === 'rejected') && (
                         <button
                           onClick={() => setBookingRefundModal({ bookingId: b.id, amount: b.totalPrice })}
                           className="mt-3 w-full border-2 border-brand-red text-brand-red py-2 px-4 font-mono text-xs uppercase font-bold hover:bg-brand-red hover:text-white transition-colors"
                         >
-                          ↩ ขอ Refund
+                          ↩ ขอ Refund {existingRefund?.status === 'rejected' && '(ขอใหม่)'}
                         </button>
                       )}
 
