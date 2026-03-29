@@ -254,106 +254,56 @@ const BookingPage: React.FC<BookingPageProps> = ({ gyms, user, setBookings }) =>
     const handleConfirmPayment = async () => {
         setIsProcessing(true);
         try {
-            const count = calculateSessionCount();
-            const start = new Date(startDate);
             const total = calculateTotal();
-            const pricePerSession = type === 'course' ? total : total / count;
 
-            // 1. Create Pending Bookings
-            const bookingPromises = [];
-            let mainBookingId = null;
+            // Prepare Booking Session Data (instead of creating database records now)
+            const bookingData = {
+                userId: user.id,
+                userName: user.name,
+                gymId: gym.id,
+                gymName: gym.name,
+                startDate,
+                endDate: (type === 'standard' || type === 'private') ? (endDate || startDate) : startDate,
+                type,
+                trainerId: selectedTrainer?.id,
+                trainerName: selectedTrainer?.name,
+                startTime: selectedTime?.start,
+                endTime: selectedTime?.end,
+                courseId: selectedCourse?.id,
+                courseTitle: selectedCourse?.title,
+                totalPrice: total,
+                affiliateCode: (referralCode && codeValid) ? referralCode : undefined,
+                affiliatePercentage: gym.affiliatePercentage || 0
+            };
 
-            if (type === 'course') {
-                const bookingPayload: Partial<Booking> = {
-                    gymId: gym.id,
-                    gymName: gym.name,
-                    userId: user.id,
-                    userName: user.name,
-                    date: startDate,
-                    type: 'course',
-                    courseId: selectedCourse?.id,
-                    courseTitle: selectedCourse?.title,
-                    totalPrice: total,
-                    commissionPaidTo: (referralCode && codeValid) ? referralCode : undefined,
-                    commissionAmount: (referralCode && codeValid) ? Math.round(total * ((gym.affiliatePercentage || 0) / 100)) : 0,
-                    status: 'pending'
-                };
-                bookingPromises.push(createBooking(bookingPayload));
-            } else {
-                const end = endDate ? new Date(endDate) : new Date(startDate);
-                let current = new Date(start);
-                while (current <= end) {
-                    const dateStr = current.toISOString().split('T')[0];
-                    const bookingPayload: Partial<Booking> = {
-                        gymId: gym.id,
-                        gymName: gym.name,
-                        userId: user.id,
-                        userName: user.name,
-                        date: dateStr,
-                        type: type,
-                        trainerId: selectedTrainer?.id || undefined,
-                        trainerName: selectedTrainer?.name,
-                        startTime: selectedTime?.start,
-                        endTime: selectedTime?.end,
-                        totalPrice: Math.round(pricePerSession),
-                        commissionPaidTo: (referralCode && codeValid) ? referralCode : undefined,
-                        commissionAmount: (referralCode && codeValid) ? Math.round(pricePerSession * ((gym.affiliatePercentage || 0) / 100)) : 0,
-                        status: 'pending'
-                    };
-                    bookingPromises.push(createBooking(bookingPayload));
+            // Save fake receipt data to local storage for the success page
+            localStorage.setItem('thaikick_last_order', JSON.stringify({
+                id: `TKB_PENDING_${Date.now()}`,
+                date: new Date().toLocaleDateString(),
+                items: [{
+                    productName: type === 'course' ? selectedCourse?.title : `${gym.name} - ${type.toUpperCase()}`,
+                    quantity: calculateSessionCount(),
+                    priceAtPurchase: total / calculateSessionCount()
+                }],
+                totalAmount: total,
+                customerEmail: user.email
+            }));
 
-                    if (type === 'standard') {
-                        current.setDate(current.getDate() + 1);
-                    } else {
-                        current.setDate(current.getDate() + 7);
-                    }
-                }
+            // Call Stripe Edge Function with THE DATA (NO ID YET)
+            const successUrl = `${window.location.origin}/#/checkout-success`;
+            const cancelUrl = window.location.href;
+
+            try {
+                const checkoutUrl = await createBookingCheckoutSession(bookingData, successUrl, cancelUrl, [paymentMethod], total);
+                window.location.href = checkoutUrl;
+                return;
+            } catch (stripeErr) {
+                console.error("Stripe Checkout Error:", stripeErr);
+                alert("Could not connect to Stripe. Please try again.");
+                setIsProcessing(false);
+                return;
             }
 
-            const createdBookings = await Promise.all(bookingPromises);
-
-            // Sync with App state immediately
-            if (setBookings) {
-                const flattened = createdBookings.flat();
-                setBookings(prev => [...prev, ...flattened]);
-            }
-
-            // For checkout, we use all created booking IDs to ensure Stripe charges the correct total
-            const allBookingIds = createdBookings.map(b => b.id);
-            mainBookingId = allBookingIds[0]; // Kept for metadata/logging if needed
-
-            if (allBookingIds.length > 0) {
-                // Save fake receipt data to local storage for the success page to pick up (since it reads from shop format)
-                localStorage.setItem('thaikick_last_order', JSON.stringify({
-                    id: mainBookingId,
-                    date: new Date().toLocaleDateString(),
-                    items: [{
-                        productName: type === 'course' ? selectedCourse?.title : `${gym.name} - ${type.toUpperCase()}`,
-                        quantity: calculateSessionCount(),
-                        priceAtPurchase: Math.round(pricePerSession)
-                    }],
-                    totalAmount: total,
-                    customerEmail: user.email
-                }));
-
-                // Call Stripe Edge Function
-                const successUrl = `${window.location.origin}/#/checkout-success`;
-                const cancelUrl = window.location.href;
-
-                try {
-                    const checkoutUrl = await createBookingCheckoutSession(allBookingIds, successUrl, cancelUrl, [paymentMethod], total);
-                    window.location.href = checkoutUrl;
-                    return; 
-                } catch (stripeErr) {
-                    console.error("Stripe Checkout Error:", stripeErr);
-                    alert("Could not connect to Stripe. Please try again.");
-                    setIsProcessing(false);
-                    return;
-                }
-            }
-
-            setIsProcessing(false);
-            navigate('/dashboard');
         } catch (error: any) {
             console.error("Booking Error Detail:", error);
             alert(`Payment processing failed: ${error.message || 'Unknown error'}. Please check browser console.`);

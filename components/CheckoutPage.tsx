@@ -99,7 +99,14 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ user }) => {
             const paymentMethods = formData.paymentMethod === 'promptpay' ? ['promptpay'] : ['card', 'promptpay'];
             
             // ── PRODUCTION: Stripe Checkout (NO ORDER CREATED YET) ──────────────────
+            const { data: { session } } = await supabase.auth.getSession();
+            const headers: any = {};
+            if (session?.access_token) {
+                headers.Authorization = `Bearer ${session.access_token}`;
+            }
+
             const { data: stripeData, error: stripeError } = await supabase.functions.invoke('stripe-checkout', {
+                headers,
                 body: {
                     orderData: {
                         userId: user.id,
