@@ -358,22 +358,68 @@ const BlockTable: React.FC<{ title: string; children: React.ReactNode; icon?: Re
 const ShopOrdersSection: React.FC<{ userId: string }> = ({ userId }) => {
   const [orders, setOrders] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [refundRequests, setRefundRequests] = React.useState<any[]>([]);
+  const [refundPolicy, setRefundPolicy] = React.useState<string>('');
+  const [refundModal, setRefundModal] = React.useState<{ orderId: string; orderType: 'shop' | 'booking'; amount: number } | null>(null);
+  const [refundReason, setRefundReason] = React.useState('');
+  const [submittingRefund, setSubmittingRefund] = React.useState(false);
 
   React.useEffect(() => {
     loadUserOrders();
+    loadRefundData();
   }, [userId]);
 
   const loadUserOrders = async () => {
     try {
       const { getShopOrdersByUser } = await import('./services/shopService');
       const data = await getShopOrdersByUser(userId);
-      // Only show paid/confirmed orders or manual pending orders in the history record
       setOrders(data.filter((o: any) => o.status !== 'payment_pending'));
     } catch (error) {
       console.error('Failed to load orders', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadRefundData = async () => {
+    try {
+      const { getUserRefundRequests, getSystemSetting } = await import('./services/dataService');
+      const [requests, policy] = await Promise.all([
+        getUserRefundRequests(userId),
+        getSystemSetting('refund_policy')
+      ]);
+      setRefundRequests(requests);
+      if (policy) setRefundPolicy(policy);
+    } catch (err) {
+      console.error('Failed to load refund data', err);
+    }
+  };
+
+  const handleSubmitRefund = async () => {
+    if (!refundModal || !refundReason.trim()) return alert('กรุณาระบุเหตุผลในการขอ Refund');
+    setSubmittingRefund(true);
+    try {
+      const { createRefundRequest } = await import('./services/dataService');
+      await createRefundRequest({
+        userId,
+        orderType: refundModal.orderType,
+        orderId: refundModal.orderId,
+        reason: refundReason.trim(),
+        amount: refundModal.amount
+      });
+      alert('ส่งคำขอ Refund เรียบร้อยแล้ว ทีมงานจะตรวจสอบและแจ้งผลให้ทราบ');
+      setRefundModal(null);
+      setRefundReason('');
+      loadRefundData();
+    } catch (err: any) {
+      alert(`เกิดข้อผิดพลาด: ${err.message || 'กรุณาลองใหม่'}`);
+    } finally {
+      setSubmittingRefund(false);
+    }
+  };
+
+  const getRefundStatus = (orderId: string) => {
+    return refundRequests.find((r: any) => r.order_id === orderId);
   };
 
   const getStatusColor = (status: string) => {
@@ -403,67 +449,159 @@ const ShopOrdersSection: React.FC<{ userId: string }> = ({ userId }) => {
   }
 
   return (
-    <div className="divide-y-2 divide-gray-100">
-      {orders.map(order => {
-        const contactDetails = order.contactDetails ? JSON.parse(order.contactDetails) : {};
-        return (
-          <div key={order.id} className="p-6 hover:bg-brand-bone transition-colors">
-            <div className="flex justify-between items-start mb-3">
-              <div>
-                <div className="font-mono text-xs text-gray-400">Order #{order.id.slice(0, 8)}</div>
-                <div className="font-mono text-sm text-gray-600 mt-1">
-                  {new Date(order.createdAt).toLocaleDateString()}
+    <>
+      <div className="divide-y-2 divide-gray-100">
+        {orders.map(order => {
+          const contactDetails = order.contactDetails ? JSON.parse(order.contactDetails) : {};
+          const existingRefund = getRefundStatus(order.id);
+          return (
+            <div key={order.id} className="p-6 hover:bg-brand-bone transition-colors">
+              <div className="flex justify-between items-start mb-3">
+                <div>
+                  <div className="font-mono text-xs text-gray-400">Order #{order.id.slice(0, 8)}</div>
+                  <div className="font-mono text-sm text-gray-600 mt-1">
+                    {new Date(order.createdAt).toLocaleDateString()}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-xl font-black">฿{order.totalAmount.toLocaleString()}</div>
+                  <span className={`inline-block px-2 py-1 text-xs font-bold uppercase mt-1 ${getStatusColor(order.status)}`}>
+                    {order.status}
+                  </span>
+                  {order.trackingNumber && (
+                    <div className="mt-2 text-xs font-mono font-bold text-brand-blue uppercase tracking-widest break-all">
+                      TRACKING: {order.trackingNumber}
+                    </div>
+                  )}
                 </div>
               </div>
-              <div className="text-right">
-                <div className="text-xl font-black">฿{order.totalAmount.toLocaleString()}</div>
-                <span className={`inline-block px-2 py-1 text-xs font-bold uppercase mt-1 ${getStatusColor(order.status)}`}>
-                  {order.status}
-                </span>
+              {order.items && order.items.length > 0 && (
+                <div className="bg-gray-50 p-3 space-y-1">
+                  {order.items.map((item: any, idx: number) => (
+                    <div key={idx} className="flex justify-between font-mono text-xs text-gray-600">
+                      <span>{item.quantity}x Product</span>
+                      <span>฿{item.priceAtPurchase.toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {(order.status === 'pending' || order.status === 'payment_pending') && order.paymentStatus !== 'paid' && (
+                <div className="mt-3 flex flex-col gap-2">
+                  <div className="flex items-center gap-2 text-[10px] font-mono text-amber-600 uppercase font-bold">
+                    <span className="inline-block w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                    Payment Pending
+                  </div>
+                  {order.stripeSessionId && (
+                    <button
+                      onClick={() => alert('Please complete the payment on the Stripe page.')}
+                      className="w-full bg-brand-charcoal text-white py-2 px-4 font-mono text-xs uppercase hover:bg-brand-blue transition-colors"
+                    >
+                      💳 Complete Stripe Payment
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {order.status === 'paid' && (
+                <div className="mt-3 flex items-center gap-2 text-[10px] font-mono text-green-600 uppercase font-bold">
+                  <span className="inline-block w-2 h-2 rounded-full bg-green-500"></span>
+                  Payment Verified
+                </div>
+              )}
+
+              {/* Refund Request Button */}
+              {(order.status === 'paid' || order.status === 'shipped') && !existingRefund && (
+                <button
+                  onClick={() => setRefundModal({ orderId: order.id, orderType: 'shop', amount: order.totalAmount })}
+                  className="mt-3 w-full border-2 border-brand-red text-brand-red py-2 px-4 font-mono text-xs uppercase font-bold hover:bg-brand-red hover:text-white transition-colors"
+                >
+                  ↩ ขอ Refund
+                </button>
+              )}
+
+              {/* Show Refund Status */}
+              {existingRefund && (
+                <div className={`mt-3 p-3 border-2 ${
+                  existingRefund.status === 'pending' ? 'border-amber-400 bg-amber-50' :
+                  existingRefund.status === 'approved' ? 'border-green-400 bg-green-50' :
+                  'border-red-400 bg-red-50'
+                }`}>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="font-mono text-[10px] font-bold uppercase">Refund Request</span>
+                    <span className={`font-mono text-[10px] font-bold uppercase px-2 py-0.5 ${
+                      existingRefund.status === 'pending' ? 'bg-amber-200 text-amber-700' :
+                      existingRefund.status === 'approved' ? 'bg-green-200 text-green-700' :
+                      'bg-red-200 text-red-700'
+                    }`}>
+                      {existingRefund.status}
+                    </span>
+                  </div>
+                  <div className="font-mono text-xs text-gray-600">{existingRefund.reason}</div>
+                  {existingRefund.admin_response && (
+                    <div className="mt-2 pt-2 border-t border-gray-200 font-mono text-xs text-gray-700">
+                      <span className="font-bold">Admin: </span>{existingRefund.admin_response}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Refund Request Modal */}
+      {refundModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setRefundModal(null)}>
+          <div className="bg-white border-2 border-brand-charcoal w-full max-w-md shadow-[8px_8px_0px_0px_#AE3A17] animate-reveal" onClick={e => e.stopPropagation()}>
+            <div className="p-4 bg-brand-charcoal text-white flex justify-between items-center">
+              <h3 className="font-black uppercase text-sm">ขอ Refund</h3>
+              <button onClick={() => setRefundModal(null)} className="text-white hover:text-brand-red font-black">✕</button>
+            </div>
+            <div className="p-6 space-y-4">
+              {/* Refund Policy */}
+              {refundPolicy && (
+                <div className="bg-blue-50 border border-brand-blue/30 p-4">
+                  <div className="font-mono text-[10px] font-bold text-brand-blue uppercase mb-2">📋 เงื่อนไขการขอ Refund</div>
+                  <p className="font-mono text-xs text-gray-700 leading-relaxed whitespace-pre-wrap">{refundPolicy}</p>
+                </div>
+              )}
+
+              <div>
+                <div className="font-mono text-xs text-gray-400 mb-1">จำนวนเงิน</div>
+                <div className="text-2xl font-black">฿{refundModal.amount.toLocaleString()}</div>
+              </div>
+
+              <div>
+                <label className="block font-mono text-xs uppercase font-bold mb-2">เหตุผลในการขอ Refund *</label>
+                <textarea
+                  value={refundReason}
+                  onChange={e => setRefundReason(e.target.value)}
+                  placeholder="กรุณาระบุเหตุผล..."
+                  className="w-full border-2 border-gray-300 p-3 font-mono text-sm focus:border-brand-blue outline-none h-28 resize-none"
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setRefundModal(null)}
+                  className="flex-1 border-2 border-gray-300 py-3 font-mono text-xs font-bold uppercase hover:bg-gray-100 transition-colors"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  onClick={handleSubmitRefund}
+                  disabled={submittingRefund || !refundReason.trim()}
+                  className="flex-1 bg-brand-red text-white py-3 font-mono text-xs font-bold uppercase hover:bg-brand-charcoal transition-colors disabled:opacity-50"
+                >
+                  {submittingRefund ? 'กำลังส่ง...' : 'ส่งคำขอ Refund'}
+                </button>
               </div>
             </div>
-            {order.items && order.items.length > 0 && (
-              <div className="bg-gray-50 p-3 space-y-1">
-                {order.items.map((item: any, idx: number) => (
-                  <div key={idx} className="flex justify-between font-mono text-xs text-gray-600">
-                    <span>{item.quantity}x Product</span>
-                    <span>฿{item.priceAtPurchase.toLocaleString()}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {(order.status === 'pending' || order.status === 'payment_pending') && order.paymentStatus !== 'paid' && (
-              <div className="mt-3 flex flex-col gap-2">
-                <div className="flex items-center gap-2 text-[10px] font-mono text-amber-600 uppercase font-bold">
-                  <span className="inline-block w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
-                  Payment Pending
-                </div>
-                {order.stripeSessionId && (
-                  <button
-                    onClick={() => {
-                      // Attempt to redirect if we have a session ID
-                      // In a real app, you might want to call the edge function to get a fresh URL
-                      alert('Please complete the payment on the Stripe page.');
-                    }}
-                    className="w-full bg-brand-charcoal text-white py-2 px-4 font-mono text-xs uppercase hover:bg-brand-blue transition-colors"
-                  >
-                    💳 Complete Stripe Payment
-                  </button>
-                )}
-              </div>
-            )}
-
-            {order.status === 'paid' && (
-              <div className="mt-3 flex items-center gap-2 text-[10px] font-mono text-green-600 uppercase font-bold">
-                <span className="inline-block w-2 h-2 rounded-full bg-green-500"></span>
-                Payment Verified
-              </div>
-            )}
           </div>
-        );
-      })}
-    </div>
+        </div>
+      )}
+    </>
   );
 };
 
@@ -473,6 +611,58 @@ const CustomerDashboard: React.FC<{ user: User; bookings: Booking[]; requestAffi
   const [editAvatar, setEditAvatar] = React.useState(user.avatar || '');
   const [avatarFile, setAvatarFile] = React.useState<File | null>(null);
   const [isSavingProfile, setIsSavingProfile] = React.useState(false);
+
+  // Booking Refund State
+  const [bookingRefundRequests, setBookingRefundRequests] = React.useState<any[]>([]);
+  const [bookingRefundPolicy, setBookingRefundPolicy] = React.useState<string>('');
+  const [bookingRefundModal, setBookingRefundModal] = React.useState<{ bookingId: string; amount: number } | null>(null);
+  const [bookingRefundReason, setBookingRefundReason] = React.useState('');
+  const [submittingBookingRefund, setSubmittingBookingRefund] = React.useState(false);
+
+  React.useEffect(() => {
+    const loadBookingRefundData = async () => {
+      try {
+        const { getUserRefundRequests, getSystemSetting } = await import('./services/dataService');
+        const [requests, policy] = await Promise.all([
+          getUserRefundRequests(user.id),
+          getSystemSetting('refund_policy')
+        ]);
+        setBookingRefundRequests(requests.filter((r: any) => r.order_type === 'booking'));
+        if (policy) setBookingRefundPolicy(policy);
+      } catch (err) {
+        console.error('Failed to load booking refund data', err);
+      }
+    };
+    loadBookingRefundData();
+  }, [user.id]);
+
+  const handleSubmitBookingRefund = async () => {
+    if (!bookingRefundModal || !bookingRefundReason.trim()) return alert('กรุณาระบุเหตุผลในการขอ Refund');
+    setSubmittingBookingRefund(true);
+    try {
+      const { createRefundRequest, getUserRefundRequests } = await import('./services/dataService');
+      await createRefundRequest({
+        userId: user.id,
+        orderType: 'booking',
+        orderId: bookingRefundModal.bookingId,
+        reason: bookingRefundReason.trim(),
+        amount: bookingRefundModal.amount
+      });
+      alert('ส่งคำขอ Refund เรียบร้อยแล้ว ทีมงานจะตรวจสอบและแจ้งผลให้ทราบ');
+      setBookingRefundModal(null);
+      setBookingRefundReason('');
+      const updated = await getUserRefundRequests(user.id);
+      setBookingRefundRequests(updated.filter((r: any) => r.order_type === 'booking'));
+    } catch (err: any) {
+      alert(`เกิดข้อผิดพลาด: ${err.message || 'กรุณาลองใหม่'}`);
+    } finally {
+      setSubmittingBookingRefund(false);
+    }
+  };
+
+  const getBookingRefundStatus = (bookingId: string) => {
+    return bookingRefundRequests.find((r: any) => r.order_id === bookingId);
+  };
 
   // Filter bookings for this user - ONLY SHOW PAID/CONFIRMED ones
   const myBookings = bookings.filter(b => b.userId === user.id && (b.status === 'confirmed' || b.status === 'completed'));
@@ -661,23 +851,64 @@ const CustomerDashboard: React.FC<{ user: User; bookings: Booking[]; requestAffi
               <div className="p-12 text-center font-mono text-sm text-gray-400">NO ACTIVE BOOKINGS</div>
             ) : (
               <div className="divide-y-2 divide-gray-100">
-                {activeBookings.map(b => (
-                  <div key={b.id} className="p-6 flex flex-col sm:flex-row justify-between sm:items-center hover:bg-brand-bone transition-colors group">
-                    <div className="flex items-center gap-6 mb-4 sm:mb-0">
-                      <div className={`w-12 h-12 flex items-center justify-center border-2 border-brand-charcoal font-black text-sm bg-brand-bone text-brand-charcoal`}>
-                        {b.type === 'private' ? 'PVT' : 'STD'}
+                {activeBookings.map(b => {
+                  const existingRefund = getBookingRefundStatus(b.id);
+                  return (
+                    <div key={b.id} className="p-6 hover:bg-brand-bone transition-colors group">
+                      <div className="flex flex-col sm:flex-row justify-between sm:items-center">
+                        <div className="flex items-center gap-6 mb-4 sm:mb-0">
+                          <div className={`w-12 h-12 flex items-center justify-center border-2 border-brand-charcoal font-black text-sm bg-brand-bone text-brand-charcoal`}>
+                            {b.type === 'private' ? 'PVT' : 'STD'}
+                          </div>
+                          <div>
+                            <div className="font-black text-lg uppercase leading-none mb-1 group-hover:text-brand-red transition-colors">{b.gymName}</div>
+                            <Mono className="text-gray-500">{b.date} • {b.trainerName || 'No Trainer'}</Mono>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-mono text-lg font-bold mb-1">฿{b.totalPrice}</div>
+                          <StatusBadge status={b.status} />
+                        </div>
                       </div>
-                      <div>
-                        <div className="font-black text-lg uppercase leading-none mb-1 group-hover:text-brand-red transition-colors">{b.gymName}</div>
-                        <Mono className="text-gray-500">{b.date} • {b.trainerName || 'No Trainer'}</Mono>
-                      </div>
+
+                      {/* Refund Button for Bookings */}
+                      {b.status === 'confirmed' && !existingRefund && (
+                        <button
+                          onClick={() => setBookingRefundModal({ bookingId: b.id, amount: b.totalPrice })}
+                          className="mt-3 w-full border-2 border-brand-red text-brand-red py-2 px-4 font-mono text-xs uppercase font-bold hover:bg-brand-red hover:text-white transition-colors"
+                        >
+                          ↩ ขอ Refund
+                        </button>
+                      )}
+
+                      {/* Show Refund Status */}
+                      {existingRefund && (
+                        <div className={`mt-3 p-3 border-2 ${
+                          existingRefund.status === 'pending' ? 'border-amber-400 bg-amber-50' :
+                          existingRefund.status === 'approved' ? 'border-green-400 bg-green-50' :
+                          'border-red-400 bg-red-50'
+                        }`}>
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="font-mono text-[10px] font-bold uppercase">Refund Request</span>
+                            <span className={`font-mono text-[10px] font-bold uppercase px-2 py-0.5 ${
+                              existingRefund.status === 'pending' ? 'bg-amber-200 text-amber-700' :
+                              existingRefund.status === 'approved' ? 'bg-green-200 text-green-700' :
+                              'bg-red-200 text-red-700'
+                            }`}>
+                              {existingRefund.status}
+                            </span>
+                          </div>
+                          <div className="font-mono text-xs text-gray-600">{existingRefund.reason}</div>
+                          {existingRefund.admin_response && (
+                            <div className="mt-2 pt-2 border-t border-gray-200 font-mono text-xs text-gray-700">
+                              <span className="font-bold">Admin: </span>{existingRefund.admin_response}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    <div className="text-right">
-                      <div className="font-mono text-lg font-bold mb-1">฿{b.totalPrice}</div>
-                      <StatusBadge status={b.status} />
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </BlockTable>
@@ -778,6 +1009,53 @@ const CustomerDashboard: React.FC<{ user: User; bookings: Booking[]; requestAffi
           </div>
         </div>
       </div>
+      {/* Booking Refund Modal */}
+      {bookingRefundModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setBookingRefundModal(null)}>
+          <div className="bg-white border-2 border-brand-charcoal w-full max-w-md shadow-[8px_8px_0px_0px_#AE3A17] animate-reveal" onClick={e => e.stopPropagation()}>
+            <div className="p-4 bg-brand-charcoal text-white flex justify-between items-center">
+              <h3 className="font-black uppercase text-sm">ขอ Refund Booking</h3>
+              <button onClick={() => setBookingRefundModal(null)} className="text-white hover:text-brand-red font-black">✕</button>
+            </div>
+            <div className="p-6 space-y-4">
+              {bookingRefundPolicy && (
+                <div className="bg-blue-50 border border-brand-blue/30 p-4">
+                  <div className="font-mono text-[10px] font-bold text-brand-blue uppercase mb-2">📋 เงื่อนไขการขอ Refund</div>
+                  <p className="font-mono text-xs text-gray-700 leading-relaxed whitespace-pre-wrap">{bookingRefundPolicy}</p>
+                </div>
+              )}
+              <div>
+                <div className="font-mono text-xs text-gray-400 mb-1">จำนวนเงิน</div>
+                <div className="text-2xl font-black">฿{bookingRefundModal.amount.toLocaleString()}</div>
+              </div>
+              <div>
+                <label className="block font-mono text-xs uppercase font-bold mb-2">เหตุผลในการขอ Refund *</label>
+                <textarea
+                  value={bookingRefundReason}
+                  onChange={e => setBookingRefundReason(e.target.value)}
+                  placeholder="กรุณาระบุเหตุผล..."
+                  className="w-full border-2 border-gray-300 p-3 font-mono text-sm focus:border-brand-blue outline-none h-28 resize-none"
+                />
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setBookingRefundModal(null)}
+                  className="flex-1 border-2 border-gray-300 py-3 font-mono text-xs font-bold uppercase hover:bg-gray-100 transition-colors"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  onClick={handleSubmitBookingRefund}
+                  disabled={submittingBookingRefund || !bookingRefundReason.trim()}
+                  className="flex-1 bg-brand-red text-white py-3 font-mono text-xs font-bold uppercase hover:bg-brand-charcoal transition-colors disabled:opacity-50"
+                >
+                  {submittingBookingRefund ? 'กำลังส่ง...' : 'ส่งคำขอ Refund'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </DashboardContainer>
   );
 };

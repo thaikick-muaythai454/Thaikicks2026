@@ -853,3 +853,77 @@ export const createBookingCheckoutSession = async (bookingId: string | string[],
 
     return data.url;
 };
+
+// ----------------------------------------------------------------------------
+// REFUND REQUESTS
+// ----------------------------------------------------------------------------
+export const createRefundRequest = async (request: {
+    userId: string;
+    orderType: 'booking' | 'shop';
+    orderId: string;
+    reason: string;
+    amount?: number;
+}) => {
+    const { data, error } = await supabase
+        .from('refund_requests')
+        .insert({
+            user_id: request.userId,
+            order_type: request.orderType,
+            order_id: request.orderId,
+            reason: request.reason,
+            amount: request.amount || 0,
+            status: 'pending'
+        })
+        .select()
+        .single();
+
+    if (error) throw error;
+    return data;
+};
+
+export const getUserRefundRequests = async (userId: string) => {
+    const { data, error } = await supabase
+        .from('refund_requests')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+    if (error) {
+        console.error('Error fetching refund requests:', error);
+        return [];
+    }
+    return data || [];
+};
+
+export const getAllRefundRequests = async () => {
+    const { data, error } = await supabase
+        .from('refund_requests')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+    if (error) {
+        console.error('Error fetching all refund requests:', error);
+        return [];
+    }
+    return data || [];
+};
+
+export const updateRefundRequestStatus = async (
+    id: string,
+    status: 'approved' | 'rejected',
+    adminResponse?: string
+) => {
+    const { data, error } = await supabase
+        .from('refund_requests')
+        .update({
+            status,
+            admin_response: adminResponse || null,
+            updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+    if (error) throw error;
+    return data;
+};
