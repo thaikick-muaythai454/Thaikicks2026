@@ -21,6 +21,17 @@ const mapUser = (sbUser: any, profile: any): User => {
 };
 
 export const signUp = async (email: string, password: string, name: string) => {
+    // 0. Check if email already exists in public registry for better UX
+    const { data: existingUser } = await supabase
+        .from('users')
+        .select('id')
+        .eq('email', email)
+        .maybeSingle();
+
+    if (existingUser) {
+        throw new Error('This email is already registered. Please login instead.');
+    }
+
     // 1. Sign up with Supabase Auth
     const { data, error } = await supabase.auth.signUp({
         email,
