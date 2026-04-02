@@ -670,7 +670,7 @@ export const getAllUsers = async (): Promise<User[]> => {
         id: u.id,
         email: u.email,
         name: u.name,
-        role: u.role === 'owner' ? 'gymowner' : u.role,
+        role: u.role,
         avatar: u.avatar_url,
         isAffiliate: u.is_affiliate,
         affiliateEarnings: u.affiliate_earnings,
@@ -681,9 +681,7 @@ export const getAllUsers = async (): Promise<User[]> => {
 };
 
 export const updateUserRole = async (userId: string, role: string, gymName?: string) => {
-    // Map 'gymowner' back to 'owner' for database compatibility if needed
-    const dbRole = role === 'gymowner' ? 'owner' : role;
-    const updates: any = { role: dbRole };
+    const updates: any = { role: role };
     if (gymName !== undefined) {
         updates.owned_gym_name = gymName;
     }
