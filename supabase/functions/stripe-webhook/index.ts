@@ -11,7 +11,16 @@ const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
 
 const endpointSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
 
+const corsHeaders = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-version, stripe-signature",
+};
+
 serve(async (req) => {
+    if (req.method === "OPTIONS") {
+        return new Response("ok", { headers: corsHeaders });
+    }
+
     const signature = req.headers.get("stripe-signature");
 
     if (!signature) {
@@ -36,32 +45,137 @@ serve(async (req) => {
         if (event.type === "checkout.session.completed") {
             const session = event.data.object;
             const orderId = session.metadata?.order_id;
-            const type = session.metadata?.type || 'shop'; // Default to shop for backward compatibility
+            const type = session.metadata?.type || 'shop';
 
-            if (orderId) {
+            if (orderId || session.metadata?.is_new_order === 'true' || session.metadata?.is_new_booking === 'true') {
                 if (type === 'booking') {
-                    // orderId could be a comma-separated string of IDs
-                    const bookingIds = orderId.split(',');
+                    let updatedBookings = [];
 
-                    // Update BOOKING status to confirmed and save payment intent
-                    const { data: updatedBookings, error: updateError } = await supabase
-                        .from("bookings")
-                        .update({
-                            status: "confirmed",
-                            payment_status: "paid",
-                            stripe_session_id: session.id,
-                            stripe_payment_intent_id: session.payment_intent // Crucial for refunds
-                        })
-                        .in("id", bookingIds)
-                        .select();
+                    if (session.metadata?.is_new_booking === 'true') {
+                        // ── NEW FLOW: Create bookings from metadata ──────────────────
+                        const m = session.metadata;
+                        const startDate = new Date(m.start_date);
+                        const endDate = new Date(m.end_date);
+                        const bType = m.booking_type;
+                        const totalPrice = parseFloat(m.total_price || '0');
+                        
+                        // Calculate count for price distribution
+                        let count = 0;
+                        const tempDate = new Date(startDate);
+                        while (tempDate <= endDate) {
+                            count++;
+                            if (bType === 'standard') tempDate.setDate(tempDate.getDate() + 1);
+                            else tempDate.setDate(tempDate.getDate() + 7);
+                            if (bType === 'course') break;
+                        }
+                        if (count === 0) count = 1;
 
-                    if (!updateError && updatedBookings && updatedBookings.length > 0) {
-                        const updatedBooking = updatedBookings[0]; // Use first for email info
-                        console.log(`Bookings ${orderId} successfully confirmed.`);
+                        const pricePerSession = Math.round(totalPrice / count);
+                        const affiliatePct = parseFloat(m.affiliate_pct || '0');
+                        const commissionPerSession = Math.round(pricePerSession * (affiliatePct / 100));
+
+                        const bookingRows = [];
+                        const currentDate = new Date(startDate);
+                        while (currentDate <= endDate) {
+                            bookingRows.push({
+                                user_id: m.user_id,
+                                user_name: m.user_name,
+                                gym_id: m.gym_id,
+                                gym_name: m.gym_name,
+                                date: currentDate.toISOString().split('T')[0],
+                                type: bType,
+                                trainer_id: m.trainer_id || null,
+                                trainer_name: m.trainer_name || null,
+                                start_time: m.start_time || null,
+                                end_time: m.end_time || null,
+                                course_id: m.course_id || null,
+                                course_title: m.course_title || null,
+                                total_price: pricePerSession,
+                                status: "confirmed",
+                                payment_status: "paid",
+                                stripe_session_id: session.id,
+                                stripe_payment_intent_id: session.payment_intent,
+                                commission_paid_to: m.affiliate_code || null,
+                                commission_amount: m.affiliate_code ? commissionPerSession : 0
+                            });
+
+                            if (bType === 'standard') currentDate.setDate(currentDate.getDate() + 1);
+                            else currentDate.setDate(currentDate.getDate() + 7);
+                            if (bType === 'course') break;
+                        }
+
+                        const { data: created, error: createError } = await supabase
+                            .from("bookings")
+                            .insert(bookingRows)
+                            .select();
+
+                        if (createError) {
+                            console.error("Failed to create bookings from metadata:", createError);
+                            return new Response(`Error: ${createError.message}`, { status: 500 });
+                        }
+                        updatedBookings = created || [];
+                    } else {
+                        // ── LEGACY FLOW: Update existing IDs ──────────────────────────
+                        const bookingIds = orderId.split(',');
+                        const { data: updated, error: updateError } = await supabase
+                            .from("bookings")
+                            .update({
+                                status: "confirmed",
+                                payment_status: "paid",
+                                stripe_session_id: session.id,
+                                stripe_payment_intent_id: session.payment_intent
+                            })
+                            .in("id", bookingIds)
+                            .select();
+                        
+                        if (updateError) {
+                            console.error(`Failed to update bookings ${orderId}:`, updateError);
+                            return new Response(`Error: ${updateError.message}`, { status: 500 });
+                        }
+                        updatedBookings = updated || [];
+                    }
+
+                    if (updatedBookings.length > 0) {
+                        const updatedBooking = updatedBookings[0];
+                        console.log(`Bookings for user ${updatedBooking.user_id} successfully processed.`);
+
+                        // Process Affiliate Commissions
+                        try {
+                            const bookingsWithAffiliate = updatedBookings.filter(
+                                (b: any) => b.commission_paid_to && b.commission_amount > 0
+                            );
+
+                            if (bookingsWithAffiliate.length > 0) {
+                                const affiliateCode = bookingsWithAffiliate[0].commission_paid_to;
+                                const totalCommission = bookingsWithAffiliate.reduce(
+                                    (sum: number, b: any) => sum + (b.commission_amount || 0), 0
+                                );
+
+                                const { data: affiliateUser } = await supabase
+                                    .from('users')
+                                    .select('id, affiliate_earnings, affiliate_status')
+                                    .ilike('affiliate_code', affiliateCode)
+                                    .single();
+
+                                if (affiliateUser && affiliateUser.affiliate_status === 'active') {
+                                    await supabase
+                                        .from('users')
+                                        .update({
+                                            affiliate_earnings: (affiliateUser.affiliate_earnings || 0) + totalCommission
+                                        })
+                                        .eq('id', affiliateUser.id);
+                                    console.log(`Credited ${totalCommission} THB to affiliate ${affiliateCode}`);
+                                }
+                            }
+                        } catch (affErr) {
+                            console.error('Affiliate error:', affErr);
+                        }
 
                         // SEND CONFIRMATION EMAIL
                         const resendApiKey = Deno.env.get("RESEND_API_KEY");
-                        if (resendApiKey) {
+                        const customerEmail = session.customer_details?.email;
+
+                        if (resendApiKey && customerEmail) {
                             try {
                                 const emailHtml = generateBookingEmailHTML({
                                     gymName: updatedBooking.gym_name,
@@ -69,39 +183,26 @@ serve(async (req) => {
                                     bookingType: updatedBooking.type,
                                     bookingId: updatedBooking.id,
                                     customerName: updatedBooking.user_name,
-                                    amount: updatedBooking.total_price,
+                                    amount: session.amount_total / 100, // Total session amount
                                     currency: 'THB'
                                 });
 
-                                // We need user email. Assuming we have user_id, let's fetch email from auth via admin or use fallback. 
-                                // Actually, session.customer_details.email contains the Stripe checkout email!
-                                const customerEmail = session.customer_details?.email;
-
-                                if (customerEmail) {
-                                    const emailResponse = await fetch('https://api.resend.com/emails', {
-                                        method: 'POST',
-                                        headers: {
-                                            'Authorization': `Bearer ${resendApiKey}`,
-                                            'Content-Type': 'application/json'
-                                        },
-                                        body: JSON.stringify({
-                                            from: 'ThaiKicks <booking@thaikicks.com>',
-                                            to: [customerEmail],
-                                            subject: 'Booking Confirmed - ThaiKicks',
-                                            html: emailHtml
-                                        })
-                                    });
-                                    if (!emailResponse.ok) {
-                                        console.error('Failed to send email:', await emailResponse.text());
-                                    } else {
-                                        console.log('Confirmation email sent to', customerEmail);
-                                    }
-                                }
+                                await fetch('https://api.resend.com/emails', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Authorization': `Bearer ${resendApiKey}`,
+                                        'Content-Type': 'application/json'
+                                    },
+                                    body: JSON.stringify({
+                                        from: 'ThaiKicks <booking@thaikicks.com>',
+                                        to: [customerEmail],
+                                        subject: 'Booking Confirmed - ThaiKicks',
+                                        html: emailHtml
+                                    })
+                                });
                             } catch (e) {
-                                console.error('Error sending confirmation email:', e);
+                                console.error('Email error:', e);
                             }
-                        } else {
-                            console.log("RESEND_API_KEY not set. Skipping email sending.");
                         }
                     }
 
@@ -246,12 +347,18 @@ serve(async (req) => {
             }
         }
 
+        console.log(`Event processed: ${event.type}`);
         return new Response(JSON.stringify({ received: true }), {
             headers: { "Content-Type": "application/json" },
             status: 200,
         });
     } catch (error) {
-        console.error(`Webhook error: ${error.message}`);
-        return new Response(`Webhook Error: ${error.message}`, { status: 400 });
+        console.error(`Webhook Error: ${error.message}`);
+        // Only return 400 if it was a signature verification failure
+        // Otherwise return 200 to acknowledge receipt and prevent Stripe retry loops
+        const isVerificationError = error.message.includes("signature");
+        return new Response(`Webhook Error: ${error.message}`, { 
+            status: isVerificationError ? 400 : 200 
+        });
     }
 });

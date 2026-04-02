@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ShoppingBag, ArrowLeft, CreditCard } from 'lucide-react';
 import { CartItem } from '../lib/types';
-import { createShopOrder } from '../services/shopService';
+import { getProducts } from '../services/shopService';
 import { User } from '../lib/types';
 import { supabase } from '../lib/supabaseClient'; // Enabled for Stripe
 
@@ -17,12 +17,40 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ user }) => {
         return saved ? JSON.parse(saved) : [];
     });
 
+    React.useEffect(() => {
+        const syncCartPrices = async () => {
+            if (cart.length === 0) return;
+            try {
+                const currentProducts = await getProducts();
+                let hasChanges = false;
+                
+                const updatedCart = cart.map(item => {
+                    const currentProduct = currentProducts.find(p => p.id === item.id);
+                    if (currentProduct && currentProduct.price !== item.price) {
+                        hasChanges = true;
+                        return { ...item, price: currentProduct.price };
+                    }
+                    return item;
+                });
+
+                if (hasChanges) {
+                    setCart(updatedCart);
+                    localStorage.setItem('thaikick_cart', JSON.stringify(updatedCart));
+                }
+            } catch (err) {
+                console.error("Failed to sync cart prices", err);
+            }
+        };
+        
+        syncCartPrices();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     const [formData, setFormData] = useState({
         name: user?.name || '',
         email: user?.email || '',
         phone: '',
         address: '',
-        affiliateCode: '',
         paymentMethod: 'promptpay'
     });
 
@@ -71,7 +99,14 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ user }) => {
             const paymentMethods = formData.paymentMethod === 'promptpay' ? ['promptpay'] : ['card', 'promptpay'];
             
             // ── PRODUCTION: Stripe Checkout (NO ORDER CREATED YET) ──────────────────
+            const { data: { session } } = await supabase.auth.getSession();
+            const headers: any = {};
+            if (session?.access_token) {
+                headers.Authorization = `Bearer ${session.access_token}`;
+            }
+
             const { data: stripeData, error: stripeError } = await supabase.functions.invoke('stripe-checkout', {
+                headers,
                 body: {
                     orderData: {
                         userId: user.id,
@@ -85,8 +120,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ user }) => {
                         contactDetails: {
                             name: formData.name,
                             email: formData.email,
-                            phone: formData.phone,
-                            affiliateCode: formData.affiliateCode || null
+                            phone: formData.phone
                         }
                     },
                     paymentMethods,
@@ -97,6 +131,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ user }) => {
             });
 
             if (stripeError) throw stripeError;
+            if (stripeData?.error) throw new Error(stripeData.error);
 
             // Clear cart only AFTER successful session creation
             localStorage.removeItem('thaikick_cart');
@@ -107,9 +142,9 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ user }) => {
             } else {
                 navigate('/checkout-success');
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Order failed:', error);
-            alert('Failed to initiate payment. Please try again.');
+            alert(`Failed to initiate payment: ${error.message || 'Please try again.'}`);
         } finally {
             setIsProcessing(false);
         }
@@ -224,17 +259,8 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ user }) => {
                                 />
                             </div>
 
-                            <div className="border border-dashed border-brand-blue p-4 bg-blue-50/50">
-                                <label className="block font-mono text-xs uppercase font-bold mb-2 text-brand-blue">Affiliate Code <span className="text-gray-400 normal-case font-normal">(Optional)</span></label>
-                                <input
-                                    type="text"
-                                    value={formData.affiliateCode}
-                                    onChange={e => setFormData({ ...formData, affiliateCode: e.target.value.toUpperCase() })}
-                                    className="w-full border-2 border-brand-blue/30 p-3 font-mono text-sm focus:border-brand-blue outline-none uppercase tracking-widest bg-white"
-                                    placeholder="e.g. FIGHTER1234"
-                                />
-                                <p className="text-[10px] font-mono text-gray-400 mt-1">Got a code from an affiliate? Enter it here.</p>
-                            </div>
+
+
 
                             <div className="border-t-2 border-brand-charcoal pt-6">
                                 <h3 className="text-xl font-black uppercase mb-4">Payment Method</h3>

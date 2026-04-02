@@ -21,12 +21,31 @@ serve(async (req) => {
     try {
         const { bookingId, reason = 'requested_by_customer' } = await req.json();
 
+        // 1. Initialize Supabase Client
         const supabase = createClient(
             Deno.env.get("SUPABASE_URL") ?? "",
             Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
         );
 
-        // 1. Fetch Booking Details
+        // 2. VERIFY AUTHENTICATION & ADMIN ROLE (CRITICAL)
+        const authHeader = req.headers.get('Authorization');
+        if (!authHeader) throw new Error("No authorization header");
+
+        const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
+        if (authError || !user) throw new Error("Unauthorized");
+
+        // Check if user is an admin
+        const { data: profile } = await supabase
+            .from('users')
+            .select('role')
+            .eq('id', user.id)
+            .single();
+
+        if (profile?.role !== 'admin') {
+            throw new Error("Unauthorized: Only admins can process refunds");
+        }
+
+        // 3. Fetch Booking Details
         const { data: booking, error: bookingError } = await supabase
             .from("bookings")
             .select("*")

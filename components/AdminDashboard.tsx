@@ -126,7 +126,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ gyms, setGyms, bookings
   const [heroFilterEnabled, setHeroFilterEnabled] = useState(true);
 
   // Tabs
-  const [activeTab, setActiveTab] = useState<'overview' | 'gyms' | 'announcements' | 'bookings' | 'courses' | 'shop' | 'appearance' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'gyms' | 'announcements' | 'bookings' | 'courses' | 'shop' | 'appearance' | 'settings' | 'refunds'>('overview');
+
+  // Refund Requests State
+  const [refundRequests, setRefundRequests] = useState<any[]>([]);
+  const [refundPolicyText, setRefundPolicyText] = useState('');
+  const [refundAdminResponse, setRefundAdminResponse] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -167,7 +172,39 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ gyms, setGyms, bookings
     loadCourses();
     loadProducts();
     loadApplications();
+    loadRefundRequests();
   }, []);
+
+  const loadRefundRequests = async () => {
+    try {
+      const { getAllRefundRequests, getSystemSetting } = await import('../services/dataService');
+      const data = await getAllRefundRequests();
+      setRefundRequests(data);
+      const policy = await getSystemSetting('refund_policy');
+      if (policy) setRefundPolicyText(policy);
+    } catch (err) {
+      console.error('Failed to load refund requests', err);
+    }
+  };
+
+  const handleRefundAction = async (requestId: string, action: 'approved' | 'rejected') => {
+    try {
+      const { updateRefundRequestStatus } = await import('../services/dataService');
+      await updateRefundRequestStatus(requestId, action, refundAdminResponse[requestId] || '');
+      await loadRefundRequests();
+    } catch (err: any) {
+      alert('Failed: ' + (err.message || String(err)));
+    }
+  };
+
+  const handleSaveRefundPolicy = async () => {
+    try {
+      await updateSystemSetting('refund_policy', refundPolicyText);
+      alert('Refund policy saved successfully');
+    } catch (err: any) {
+      alert('Failed: ' + (err.message || String(err)));
+    }
+  };
 
   const loadApplications = async () => {
     const data = await getAffiliateApplications();
@@ -455,7 +492,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ gyms, setGyms, bookings
     setIsRefunding(bookingId);
     try {
       const { supabase } = await import('../lib/supabaseClient');
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: any = {};
+      if (session?.access_token) {
+        headers.Authorization = `Bearer ${session.access_token}`;
+      }
+
       const { data, error } = await supabase.functions.invoke('stripe-refund', {
+        headers,
         body: { bookingId }
       });
 
@@ -665,6 +709,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ gyms, setGyms, bookings
           </button>
           <button onClick={() => setActiveTab('settings')} className={`w-full text-left px-4 py-3 font-mono text-xs font-bold uppercase transition-colors flex items-center gap-3 ${activeTab === 'settings' ? 'bg-brand-charcoal text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'}`}>
             <Plus className="w-4 h-4" /> Settings
+          </button>
+          <button onClick={() => setActiveTab('refunds')} className={`w-full text-left px-4 py-3 font-mono text-xs font-bold uppercase transition-colors flex items-center gap-3 ${activeTab === 'refunds' ? 'bg-brand-red text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'}`}>
+            <RotateCcw className="w-4 h-4" /> Refund Requests
+            {refundRequests.filter(r => r.status === 'pending').length > 0 && (
+              <span className="bg-brand-red text-white text-[9px] font-black px-2 py-0.5 rounded-full animate-pulse">
+                {refundRequests.filter(r => r.status === 'pending').length}
+              </span>
+            )}
           </button>
         </aside>
 
@@ -926,6 +978,94 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ gyms, setGyms, bookings
                 </button>
               </div>
             </BlockTable>
+          )}
+
+          {activeTab === 'refunds' && (
+            <div className="space-y-8">
+              {/* Refund Policy Text Setting */}
+              <BlockTable title="ตั้งค่าข้อความเงื่อนไข Refund" icon={<RotateCcw className="w-4 h-4" />}>
+                <div className="p-6 space-y-4">
+                  <p className="font-mono text-xs text-gray-500">ข้อความนี้จะแสดงให้ User เห็นก่อนที่จะกดส่งคำขอ Refund</p>
+                  <textarea
+                    value={refundPolicyText}
+                    onChange={e => setRefundPolicyText(e.target.value)}
+                    className="w-full border-2 border-brand-charcoal p-4 font-mono text-sm h-40 resize-none"
+                    placeholder="ระบุเงื่อนไขการขอ Refund ที่นี่ เช่น 'การขอ Refund สามารถทำได้ภายใน 7 วัน ...'"
+                  />
+                  <button onClick={handleSaveRefundPolicy} className="bg-brand-charcoal text-white px-6 py-3 font-mono text-xs font-bold uppercase hover:bg-brand-blue transition-colors">
+                    บันทึกเงื่อนไข
+                  </button>
+                </div>
+              </BlockTable>
+
+              {/* Pending Refund Requests */}
+              <BlockTable title={`คำขอ Refund (${refundRequests.filter(r => r.status === 'pending').length} pending)`} icon={<RotateCcw className="w-4 h-4" />}>
+                {refundRequests.length === 0 ? (
+                  <div className="p-12 text-center font-mono text-sm text-gray-400">ไม่มีคำขอ REFUND</div>
+                ) : (
+                  <div className="divide-y divide-gray-100">
+                    {refundRequests.map(req => (
+                      <div key={req.id} className={`p-6 ${req.status === 'pending' ? 'bg-amber-50/50' : ''}`}>
+                        <div className="flex flex-col md:flex-row justify-between md:items-start gap-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <span className={`px-2 py-0.5 font-mono text-[9px] font-black uppercase ${
+                                req.status === 'pending' ? 'bg-amber-200 text-amber-700' :
+                                req.status === 'approved' ? 'bg-green-200 text-green-700' :
+                                'bg-red-200 text-red-700'
+                              }`}>
+                                {req.status}
+                              </span>
+                              <span className="font-mono text-[10px] text-gray-400 uppercase">{req.order_type}</span>
+                              <span className="font-mono text-[10px] text-gray-400">#{req.order_id?.slice(0, 8)}</span>
+                            </div>
+                            <div className="font-mono text-xs text-gray-400 mb-1">User ID: {req.user_id?.slice(0, 12)}...</div>
+                            <div className="text-xl font-black mb-2">฿{Number(req.amount || 0).toLocaleString()}</div>
+                            <div className="bg-gray-50 p-3 border border-gray-200">
+                              <span className="font-mono text-[10px] font-bold text-gray-400 uppercase block mb-1">เหตุผลของ User</span>
+                              <p className="font-mono text-xs text-gray-700">{req.reason}</p>
+                            </div>
+                            <div className="font-mono text-[10px] text-gray-400 mt-2">{new Date(req.created_at).toLocaleString()}</div>
+                          </div>
+
+                          {req.status === 'pending' && (
+                            <div className="w-full md:w-72 space-y-3">
+                              <textarea
+                                placeholder="ตอบกลับ User (ไม่บังคับ)..."
+                                value={refundAdminResponse[req.id] || ''}
+                                onChange={e => setRefundAdminResponse(prev => ({ ...prev, [req.id]: e.target.value }))}
+                                className="w-full border-2 border-gray-300 p-3 font-mono text-xs h-20 resize-none focus:border-brand-blue outline-none"
+                              />
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => handleRefundAction(req.id, 'approved')}
+                                  className="flex-1 bg-green-600 text-white py-2 font-mono text-xs font-bold uppercase hover:bg-green-700 transition-colors"
+                                >
+                                  ✓ Approve
+                                </button>
+                                <button
+                                  onClick={() => handleRefundAction(req.id, 'rejected')}
+                                  className="flex-1 bg-red-600 text-white py-2 font-mono text-xs font-bold uppercase hover:bg-red-700 transition-colors"
+                                >
+                                  ✗ Reject
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {req.status !== 'pending' && req.admin_response && (
+                            <div className="w-full md:w-72 p-3 bg-gray-100 border border-gray-200">
+                              <span className="font-mono text-[10px] font-bold text-gray-400 uppercase block mb-1">Admin Response</span>
+                              <p className="font-mono text-xs text-gray-700">{req.admin_response}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </BlockTable>
+            </div>
           )}
         </div>
       </div>
