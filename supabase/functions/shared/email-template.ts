@@ -162,3 +162,54 @@ export const generateShopEmailHTML = (params: {
 </html>
     `;
 };
+
+export const generateWelcomeEmailHTML = (params: {
+    customerName: string;
+}) => {
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to ThaiKicks</title>
+    <style>
+        body { font-family: 'Courier New', Courier, monospace; background-color: #f4f4f4; margin: 0; padding: 0; }
+        .container { max-width: 600px; margin: 40px auto; background-color: #ffffff; padding: 40px; border: 2px solid #1a1a1a; box-shadow: 8px 8px 0px 0px #AE3A17; }
+        .header { text-align: center; margin-bottom: 30px; border-bottom: 2px dashed #e5e7eb; padding-bottom: 20px; }
+        .logo { font-size: 24px; font-weight: 900; color: #1a1a1a; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 10px; }
+        .title { font-size: 14px; color: #3471AE; font-weight: bold; text-transform: uppercase; }
+        .body-text { margin-bottom: 30px; line-height: 1.6; color: #4b5563; font-size: 14px; }
+        .footer { text-align: center; border-top: 2px solid #1a1a1a; padding-top: 20px; margin-top: 30px; }
+        .footer p { font-size: 12px; color: #6b7280; margin: 5px 0; }
+        .cta-button { background-color: #1a1a1a; color: #ffffff; text-decoration: none; padding: 12px 24px; display: inline-block; font-weight: bold; text-transform: uppercase; margin-top: 15px; font-size: 14px; box-shadow: 4px 4px 0px #3471AE; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">THAIKICKS</div>
+            <div class="title">WELCOME TO THE ARENA</div>
+        </div>
+        
+        <div class="body-text">
+            <p>Hello <strong>${params.customerName}</strong>,</p>
+            <p>Welcome to ThaiKicks - the ultimate platform for Muay Thai practitioners. Whether you're a seasoned fighter or just starting your journey, we're here to help you find the best training camps and gyms across Thailand.</p>
+            <p>Your account has been successfully created. You can now explore verified gyms, book elite training sessions, and shop for authentic equipment.</p>
+            <p>Forge your legacy. One kick at a time.</p>
+            
+            <div style="text-align: center; margin-top: 40px;">
+                <a href="https://thaikicks.com" class="cta-button">EXPLORE GYMS NOW</a>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p><strong>SYSTEM INITIALIZED • VERSION 2026</strong></p>
+            <p>If you have any questions, our team is ready to assist you.</p>
+            <p>© 2026 ThaiKicks. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>
+    `;
+};

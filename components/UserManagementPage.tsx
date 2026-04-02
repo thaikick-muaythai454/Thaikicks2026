@@ -26,6 +26,7 @@ const UserManagementPage: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedRole, setSelectedRole] = useState<UserRole | 'all'>('all');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -84,10 +85,12 @@ const UserManagementPage: React.FC = () => {
     }
   };
 
-  const filteredUsers = users.filter(u =>
-    u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    u.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredUsers = users.filter(u => {
+    const matchesSearch = u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      u.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesRole = selectedRole === 'all' || u.role === selectedRole;
+    return matchesSearch && matchesRole;
+  });
 
   if (loading) {
     return (
@@ -112,15 +115,35 @@ const UserManagementPage: React.FC = () => {
           <h1 className="text-5xl font-black uppercase text-brand-charcoal mt-2">User Registry</h1>
         </div>
 
-        <div className="relative max-w-sm w-full">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search by Name or Email..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-white border-2 border-brand-charcoal p-4 pl-12 font-mono text-sm uppercase focus:bg-brand-bone transition-colors outline-none"
-          />
+        <div className="flex flex-col sm:flex-row gap-4 w-full md:max-w-xl">
+          <div className="relative flex-1">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search by Name or Email..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-white border-2 border-brand-charcoal p-4 pl-12 font-mono text-sm uppercase focus:bg-brand-bone transition-colors outline-none"
+            />
+          </div>
+
+          <select
+            value={selectedRole}
+            onChange={(e) => setSelectedRole(e.target.value as any)}
+            className="bg-brand-charcoal text-white font-mono text-xs uppercase font-black px-6 py-4 outline-none hover:bg-brand-blue cursor-pointer appearance-none transition-colors border-2 border-brand-charcoal"
+            style={{
+              backgroundImage: 'url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23FFFFFF%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E")',
+              backgroundRepeat: 'no-repeat',
+              backgroundPosition: 'right 1rem top 50%',
+              backgroundSize: '0.6rem auto',
+              paddingRight: '2.5rem'
+            }}
+          >
+            <option value="all">Any Access Level</option>
+            <option value="customer">Customer Only</option>
+            <option value="gymowner">Owner Only</option>
+            <option value="admin">Admin Only</option>
+          </select>
         </div>
       </div>
 
@@ -160,9 +183,7 @@ const UserManagementPage: React.FC = () => {
                       <div className="min-w-0">
                         <div className="font-black text-sm uppercase text-brand-charcoal truncate">{user.name}</div>
                         <div className="text-gray-400 truncate text-[10px] lowercase">{user.email}</div>
-                        {user.role === 'gymowner' && user.ownedGymName && (
-                          <div className="text-brand-blue font-bold text-[9px] uppercase mt-1">Gym: {user.ownedGymName}</div>
-                        )}
+                        {/* Gym Name moved to Access Level column */}
                       </div>
                     </div>
                   </td>
@@ -194,6 +215,18 @@ const UserManagementPage: React.FC = () => {
                         <option value="gymowner">Owner</option>
                         <option value="admin">Admin</option>
                       </select>
+                      {user.role === 'gymowner' && (
+                        <div className="flex flex-col">
+                          {user.ownedGymName ? (
+                            <span className="text-[10px] font-black text-brand-blue bg-blue-50 px-2 py-0.5 border border-brand-blue/20 rounded mt-1">
+                              CAMP: {user.ownedGymName}
+                            </span>
+                          ) : (
+                            <span className="text-[9px] text-gray-400 italic mt-1">No Gym Assigned</span>
+                          )}
+                        </div>
+                      )}
+                      
                       {updatingId === user.id && (
                         <div className="w-4 h-4 border-2 border-brand-blue border-t-transparent rounded-full animate-spin"></div>
                       )}

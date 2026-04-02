@@ -5,7 +5,6 @@ import { User } from '../lib/types';
 // Map Supabase User to our App User Type
 const mapUser = (sbUser: any, profile: any): User => {
     let role = profile?.role || 'customer';
-    if (role === 'owner') role = 'gymowner';
 
     return {
         id: sbUser.id,
@@ -66,20 +65,6 @@ export const signInWithGoogle = async () => {
     return data;
 };
 
-export const signInWithFacebook = async () => {
-    const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'facebook',
-        options: {
-            redirectTo: window.location.origin,
-            queryParams: {
-                prompt: 'consent',
-            },
-        }
-    });
-
-    if (error) throw error;
-    return data;
-};
 
 export const signOut = async () => {
     const { error } = await supabase.auth.signOut();
